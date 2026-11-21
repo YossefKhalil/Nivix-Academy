@@ -55,22 +55,29 @@ node src/index.mjs [--port 7788] [--workspace DIR] [--ui DIR] [--open]
 | `POST /api/server/start` | `{ lang: "python" \| "csharp" }` |
 | `POST /api/server/stop` | stop the player's server |
 | `POST /api/judge` | `{ round, lang }` — run the round's test suite |
-| `POST /api/room` | create a room code (host) |
-| `POST /api/join` | `{ host, port, code }` — join a host over LAN/ZeroTier |
+| `POST /api/room` | `{ mode: "single" \| "multi", network?, maxPlayers? }` — host a room |
+| `POST /api/join` | `{ network?, host, port, code, name, lang }` — join over libzt/LAN |
+| `POST /api/leave` | tear the room down |
 | `GET /api/logs` | recent server output |
 
 ### WebSockets
 
-- `/ws/local` — browser ⇄ agent. The agent relays messages to the peer and wraps
-  incoming peer messages as `{ t: "peer", msg }`.
-- `/ws/peer?room=CODE` — agent ⇄ agent.
+- `/ws/local` — browser ⇄ agent. Send `{ t: "join", name, lang }`, `{ t: "action", action }`,
+  or `{ t: "ready", value }`; receive `{ t: "room", room }` and `{ t: "action", … }`.
+- Peers connect agent ⇄ agent over the **libzt** transport (newline-JSON TCP), not HTTP.
 
-## ZeroTier
+### Rooms
 
-Join both machines to the same ZeroTier network. The agent auto-detects the
-ZeroTier interface, shows its address in `/api/status`, and binds `0.0.0.0` so
-the other peer can reach `ws://<zerotier-ip>:7788` — no relay, no port
-forwarding. ZT handles NAT traversal and encryption.
+The host chooses **single-player** (`mode: "single"`) or a **multiplayer room** with up
+to `maxPlayers`. The host agent is authoritative: it owns the member list and relays
+actions to every browser and peer agent. Guests mirror the host's room snapshot.
+
+## ZeroTier (libzt)
+
+Both agents join the same ZeroTier network in **userspace** via `libzt` — no system
+ZeroTier install, no admin, no virtual adapter. The host listens for peers on the
+libzt socket; guests dial the host's libzt address. If libzt is unavailable the
+transport falls back to plain TCP on the LAN.
 
 ## Status
 

@@ -11,6 +11,7 @@ web/node_modules/.vite/
 agent/workspace/**/bin/
 agent/workspace/**/obj/
 agent/workspace/**/.vs/
+agent/.zt/
 agent/logs/
 
 # vendored reference clones (cherry-picked components already live in web/src/components/ui)

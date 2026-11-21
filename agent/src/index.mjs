@@ -21,6 +21,8 @@ import { networkSummary } from './zerotier.mjs'
 import { detectEditor, openEditor } from './editor.mjs'
 import { ServerRunner } from './runner.mjs'
 import { runRound } from './judge.mjs'
+import { Room } from './room.mjs'
+import { libztAvailable } from './transport.mjs'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const AGENT_ROOT = resolvePath(here, '..')
@@ -98,14 +100,20 @@ ensureWorkspace()
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const makeCode = () => Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('')
 
-const state = {
-  startedAt: Date.now(),
-  role: null,
-  room: null,
-  locals: new Set(),
-  peer: null,
-  logs: [],
-}
+const state = { startedAt: Date.now(), logs: [] }
+
+const PEER_PORT = Number(opt('peer-port', 7789))
+let libztReady = false
+libztAvailable().then(v => { libztReady = v })
+
+const room = new Room({
+  stateDir: join(AGENT_ROOT, '.zt'),
+  onLog: line => {
+    state.logs.push(line)
+    if (state.logs.length > 500) state.logs.shift()
+    process.stdout.write(`  │ ${line.trimEnd()}\n`)
+  },
+})
 
 const runner = new ServerRunner({
   workspace: WORKSPACE,
@@ -152,9 +160,8 @@ function status() {
     interfaces: net.interfaces,
     editor: detectEditor(),
     server: runner.status,
-    role: state.role,
-    room: state.room,
-    peers: { local: state.locals.size, remote: state.peer?.readyState === WebSocket.OPEN ? 1 : 0 },
+    libzt: libztReady,
+    room: room.snapshot(),
   }
 }
 
@@ -209,49 +216,9 @@ function serveStatic(req, res) {
   createReadStream(file).pipe(res)
 }
 
-/* ── websockets / relay ─────────────────────────────── */
+/* ── websockets ─────────────────────────────────────── */
 
 const wss = new WebSocketServer({ noServer: true })
-
-function broadcastLocal(obj) {
-  const msg = JSON.stringify(obj)
-  for (const ws of state.locals) if (ws.readyState === WebSocket.OPEN) ws.send(msg)
-}
-
-function sendToPeer(obj) {
-  if (state.peer?.readyState === WebSocket.OPEN) state.peer.send(JSON.stringify(obj))
-}
-
-function attachLocal(ws) {
-  state.locals.add(ws)
-  ws.send(JSON.stringify({ t: 'hello', status: status() }))
-  ws.on('message', data => {
-    let msg
-    try { msg = JSON.parse(data.toString()) } catch { return }
-    if (msg?.t === 'ping') { ws.send(JSON.stringify({ t: 'pong', at: Date.now() })); return }
-    sendToPeer({ t: 'relay', msg })
-  })
-  ws.on('close', () => state.locals.delete(ws))
-  ws.on('error', () => state.locals.delete(ws))
-}
-
-function attachPeer(ws, info) {
-  state.peer = ws
-  ws.on('message', data => {
-    let msg
-    try { msg = JSON.parse(data.toString()) } catch { return }
-    if (msg?.t === 'relay') broadcastLocal({ t: 'peer', msg: msg.msg })
-    else if (msg?.t === 'hello') broadcastLocal({ t: 'peer-hello', room: msg.room })
-  })
-  ws.on('close', () => {
-    if (state.peer === ws) {
-      state.peer = null
-      broadcastLocal({ t: 'peer', event: 'closed' })
-    }
-  })
-  ws.on('error', () => {})
-  broadcastLocal({ t: 'peer', event: 'connected', info })
-}
 
 /* ── http ───────────────────────────────────────────── */
 
@@ -295,27 +262,42 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/logs') return sendJson(res, 200, { ok: true, logs: state.logs.slice(-200) })
 
       if (url.pathname === '/api/room' && req.method === 'POST') {
-        if (!state.room) { state.room = makeCode(); state.role = 'host' }
-        return sendJson(res, 200, { ok: true, room: state.room, status: status() })
+        const body = await readJson(req)
+        try {
+          const snap = await room.createHost({
+            mode: body.mode,
+            network: body.network,
+            maxPlayers: body.maxPlayers,
+            peerPort: Number(body.peerPort) || PEER_PORT,
+          })
+          return sendJson(res, 200, { ok: true, room: snap })
+        } catch (e) {
+          return sendJson(res, 500, { ok: false, error: String(e?.message || e) })
+        }
       }
 
       if (url.pathname === '/api/join' && req.method === 'POST') {
         const body = await readJson(req)
-        const host = String(body.host || state.peerInfo?.host || '')
-        const port = Number(body.port) || PORT
+        const host = String(body.host || '')
         const code = String(body.code || '').toUpperCase()
         if (!host || !code) return sendJson(res, 400, { ok: false, error: 'host and code required' })
-        const url = `ws://${host}:${port}/ws/peer?room=${encodeURIComponent(code)}`
-        const result = await joinRoom(url, code)
-        return sendJson(res, result.ok ? 200 : 502, result)
+        try {
+          const r = await room.joinRemote({
+            network: body.network,
+            host,
+            port: Number(body.port) || PEER_PORT,
+            code,
+            member: { name: body.name, lang: body.lang },
+          })
+          return sendJson(res, 200, { ok: true, ...r })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
       }
 
       if (url.pathname === '/api/leave' && req.method === 'POST') {
-        try { state.peer?.close() } catch { /* ignore */ }
-        state.peer = null
-        state.room = null
-        state.role = null
-        return sendJson(res, 200, { ok: true })
+        await room.teardown()
+        return sendJson(res, 200, { ok: true, room: room.snapshot() })
       }
 
       return sendJson(res, 404, { ok: false, error: 'unknown endpoint' })
@@ -324,7 +306,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (url.pathname === '/ws/local' || url.pathname === '/ws/peer') {
+  if (url.pathname === '/ws/local') {
     // handled in 'upgrade'
     res.writeHead(426); res.end('upgrade required'); return
   }
@@ -332,38 +314,10 @@ const server = http.createServer(async (req, res) => {
   serveStatic(req, res)
 })
 
-function joinRoom(url, code) {
-  return new Promise(resolve => {
-    let ws
-    try { ws = new WebSocket(url) } catch (e) { resolve({ ok: false, error: String(e?.message || e) }); return }
-    const timer = setTimeout(() => { try { ws.close() } catch { /* ignore */ }; resolve({ ok: false, error: 'connect timeout' }) }, 8000)
-    ws.once('open', () => {
-      clearTimeout(timer)
-      state.role = 'guest'
-      state.room = code
-      attachPeer(ws, { url })
-      try { ws.send(JSON.stringify({ t: 'hello', room: code, role: 'guest' })) } catch { /* ignore */ }
-      resolve({ ok: true, url, status: status() })
-    })
-    ws.once('error', e => { clearTimeout(timer); resolve({ ok: false, error: e?.message || 'connect failed' }) })
-  })
-}
-
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, 'http://local')
-  if (url.pathname !== '/ws/local' && url.pathname !== '/ws/peer') { socket.destroy(); return }
-
-  if (url.pathname === '/ws/peer') {
-    const room = (url.searchParams.get('room') || '').toUpperCase()
-    if (!state.room || room !== state.room) {
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return
-    }
-  }
-
-  wss.handleUpgrade(req, socket, head, ws => {
-    if (url.pathname === '/ws/peer') attachPeer(ws, { room: (url.searchParams.get('room') || '').toUpperCase() })
-    else attachLocal(ws)
-  })
+  if (url.pathname !== '/ws/local') { socket.destroy(); return }
+  wss.handleUpgrade(req, socket, head, ws => room.joinLocal(ws))
 })
 
 server.listen(PORT, BIND, () => {
@@ -375,6 +329,8 @@ server.listen(PORT, BIND, () => {
   console.log(`  UI          http://127.0.0.1:${PORT}/`)
   console.log(`  LAN / ZT    ${net.preferred ? `ws://${net.preferred}:${PORT}` : 'no external IPv4 found'}`)
   console.log(`  ZeroTier    ${net.zerotier ? `${net.zerotier.name} · ${net.zerotier.address}` : 'not detected'}`)
+  console.log(`  libzt       ${libztReady ? 'available (embedded ZeroTier)' : 'not available — LAN sockets only'}`)
+  console.log(`  Peer port   ${PEER_PORT}`)
   console.log(`  Editor      ${editor ? `${editor.name} (${editor.command})` : 'none found'}`)
   console.log(`  Workspace   ${WORKSPACE}`)
   console.log(`  UI build    ${existsSync(join(UI_DIR, 'index.html')) ? UI_DIR : 'MISSING — run `npm run build` in web/'}`)
@@ -390,8 +346,8 @@ server.listen(PORT, BIND, () => {
 })
 
 const shutdown = async () => {
+  try { await room.teardown() } catch { /* ignore */ }
   try { await runner.stop() } catch { /* ignore */ }
-  try { state.peer?.close() } catch { /* ignore */ }
   process.exit(0)
 }
 process.on('SIGINT', shutdown)
