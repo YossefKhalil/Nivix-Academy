@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HTTP DUEL — UX Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050a12; --surface:#0a1220; --surface2:#0e1626; --border:#1b2a44; --border2:#24385c;
+  --text:#e6f1ff; --muted:#7c8db5; --accent:#22d3ee; --accent2:#8b5cf6;
+  --pass:#2dd4bf; --warn:#fbbf24; --fail:#fb7185;
+  --term-bg:#04080f; --term-fg:#c9f0ff;
+  --display:'Orbitron',sans-serif; --mono:'JetBrains Mono',Consolas,monospace; --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  color:var(--text);font-family:var(--body);font-size:14px;overflow:hidden;
+  background:
+    radial-gradient(1200px 600px at 72% -10%,rgba(34,211,238,.07),transparent 60%),
+    radial-gradient(900px 500px at 8% 112%,rgba(139,92,246,.07),transparent 60%),
+    var(--bg);
+}
+#app{height:100vh;display:flex;flex-direction:column}
+.k{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted);white-space:nowrap}
+.spacer{flex:1}
+small{font-size:10px;opacity:.6}
+
+.proto{flex:0 0 26px;display:flex;align-items:center;padding:0 12px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--warn);border-bottom:1px dashed rgba(251,191,36,.35);background:rgba(20,14,4,.5)}
+
+.btn{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:7px 12px;background:transparent;color:var(--muted);border:1px solid var(--border2);cursor:pointer;transition:.15s}
+.btn:hover:not(:disabled){color:var(--accent);border-color:var(--accent);box-shadow:0 0 14px rgba(34,211,238,.18)}
+.btn.exec{color:var(--accent);border-color:rgba(34,211,238,.5)}
+.btn.warn{color:var(--warn);border-color:rgba(251,191,36,.5)}
+.btn.danger{color:var(--fail);border-color:rgba(251,113,133,.5)}
+.btn:disabled{opacity:.32;cursor:not-allowed;box-shadow:none}
+.chip{font-family:var(--mono);font-size:9px;letter-spacing:.1em;padding:2px 6px;border:1px solid var(--border2);color:var(--muted)}
+.chip.ok{color:var(--pass);border-color:rgba(45,212,191,.5)}
+.chip.lock{color:var(--warn);border-color:rgba(251,191,36,.5)}
+.chip.score{color:var(--accent);border-color:rgba(34,211,238,.5)}
+.tab{font-family:var(--mono);font-size:10px;letter-spacing:.12em;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 10px;cursor:pointer}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+
+.panel{position:relative;background:linear-gradient(180deg,rgba(14,22,38,.92),rgba(8,14,24,.92));border:1px solid var(--border)}
+.panel::before,.panel::after{content:'';position:absolute;width:9px;height:9px;pointer-events:none}
+.panel::before{top:-1px;left:-1px;border-top:1px solid var(--accent);border-left:1px solid var(--accent)}
+.panel::after{bottom:-1px;right:-1px;border-bottom:1px solid var(--accent);border-right:1px solid var(--accent)}
+
+/* single-line HUD */
+.hud{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);background:rgba(6,11,20,.92);white-space:nowrap;overflow:hidden}
+.brand{font-family:var(--display);font-weight:700;letter-spacing:.13em;color:var(--accent);font-size:12px}
+.sep{color:var(--border2)}
+.round-pips{display:none}
+.clock{font-family:var(--display);font-size:15px;letter-spacing:.08em;color:var(--text)}
+.pcard{display:flex;align-items:center;gap:7px;padding:4px 9px;border:1px solid var(--border);background:rgba(10,18,32,.6)}
+.pcard .pname{font-family:var(--display);font-size:11px;letter-spacing:.08em}
+.pcard .lang{font-family:var(--mono);font-size:9px;color:var(--accent2);border:1px solid rgba(139,92,246,.4);padding:2px 5px}
+.vs{font-family:var(--display);font-size:10px;color:var(--muted)}
+.stage{display:flex;gap:3px}
+.stage i{width:16px;height:6px;background:var(--border2);display:block}
+.stage i.on{background:var(--accent);box-shadow:0 0 8px rgba(34,211,238,.55)}
+.conn{display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--muted)}
+.dot.on{background:var(--pass);box-shadow:0 0 8px var(--pass)}
+.dot.rec{background:var(--warn);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+
+.screen{flex:1;min-height:0;display:flex;flex-direction:column}
+.boot-screen{align-items:flex-start;justify-content:center;padding:0 60px;cursor:pointer}
+.boot{font-family:var(--mono);color:var(--accent);font-size:15px;line-height:2.1}
+.caret{animation:pulse .9s infinite;color:var(--accent)}
+.hint{margin-top:18px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em}
+
+.lobby{align-items:center;justify-content:center;overflow:auto}
+.lobby-wrap{width:min(880px,92vw);display:flex;flex-direction:column;gap:16px;padding:24px 0}
+.lobby-title{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.18em;color:var(--accent)}
+.profile{display:flex;gap:26px;padding:18px 20px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--muted)}
+.field input{background:rgba(4,8,15,.7);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:14px;letter-spacing:.1em;padding:9px 12px;outline:none;min-width:230px}
+.field input:focus{border-color:var(--accent);box-shadow:0 0 14px rgba(34,211,238,.15)}
+.seg-group{display:flex}
+.seg{font-family:var(--mono);font-size:11px;letter-spacing:.1em;padding:9px 16px;background:transparent;border:1px solid var(--border2);color:var(--muted);cursor:pointer}
+.seg.on{color:var(--accent);border-color:var(--accent);box-shadow:0 0 14px rgba(34,211,238,.15)}
+.join-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.join-card{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.join-card p{color:var(--muted);font-size:13px;line-height:1.6;margin:0}
+.join-card input{background:rgba(4,8,15,.7);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);letter-spacing:.16em;padding:9px 12px;outline:none;text-transform:uppercase}
+.room-panel{padding:16px 20px;display:grid;grid-template-columns:auto 1fr;gap:6px 18px;align-items:center}
+.code{font-family:var(--display);font-size:28px;letter-spacing:.24em;color:var(--accent)}
+.link{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.players{display:flex;align-items:center;gap:16px}
+.pcard-lg{flex:1;display:flex;align-items:center;gap:12px;padding:14px 16px}
+.pcard-lg .pname{font-family:var(--display);font-size:15px;letter-spacing:.1em}
+.pcard-lg .lang{font-family:var(--mono);font-size:10px;color:var(--accent2)}
+.lobby-actions{display:flex;justify-content:center;padding:4px}
+
+.match{flex:1;display:grid;grid-template-columns:44% 1fr;min-height:0}
+.col-left{display:grid;grid-template-rows:1fr 200px;min-height:0;border-right:1px solid var(--border)}
+.col-right{display:grid;grid-template-rows:1fr 240px;min-height:0}
+.brief{overflow:auto;padding:22px 26px}
+.brief h1{font-family:var(--display);font-size:17px;letter-spacing:.06em;margin:.1em 0 .8em}
+.brief p{color:var(--muted);line-height:1.7}
+.brief ul{padding-left:18px;line-height:2;color:var(--muted)}
+.brief code{font-family:var(--mono);font-size:12px;color:var(--accent);background:rgba(34,211,238,.08);padding:1px 5px}
+.hints-toggle{margin-top:22px;padding:14px 0 0;width:100%;display:flex;align-items:center;gap:8px;background:transparent;border:0;border-top:1px dashed rgba(27,42,68,.8);font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--accent2);cursor:pointer}
+.hints-toggle:hover{color:var(--accent)}
+.hints-toggle .cost{color:var(--warn);opacity:.85}
+.ezap{font-size:11px;line-height:1;color:var(--accent)}
+.ezap.low{color:var(--warn)} .ezap.crit{color:var(--fail)}
+.emeter{width:46px;height:6px;background:var(--border2);display:inline-block;position:relative;overflow:hidden}
+.emeter i{position:absolute;top:0;bottom:0;left:0;background:var(--accent);box-shadow:0 0 8px rgba(34,211,238,.5)}
+.emeter.low i{background:var(--warn);box-shadow:0 0 8px rgba(251,191,36,.5)}
+.emeter.crit i{background:var(--fail);box-shadow:0 0 8px rgba(251,113,133,.5)}
+.ev{font-family:var(--display);font-size:11px;color:var(--accent);min-width:20px;text-align:right}
+.ev.low{color:var(--warn)} .ev.crit{color:var(--fail)}
+.wiki .energy{color:var(--warn);font-family:var(--display);letter-spacing:.05em}
+.hints-block{margin-top:10px;padding:10px 12px;border-left:2px solid var(--accent2);background:rgba(139,92,246,.06)}
+
+.chat{border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;background:rgba(6,11,20,.55)}
+.chat-head{display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid rgba(27,42,68,.55)}
+.chat-log{flex:1;overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px;font-size:12px}
+.msg .who{color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:.08em;margin-right:6px}
+.msg.me .who{color:var(--pass)}
+.msg.sys{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em}
+.chat-input{border-top:1px solid rgba(27,42,68,.55)}
+.chat-input input{width:100%;background:transparent;border:0;color:var(--text);padding:10px 14px;font-family:var(--body);font-size:13px;outline:none}
+.chat-head .tab{padding:6px 10px}
+.wiki{flex:1;min-height:0;overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.wiki .src{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--accent2)}
+.doc{display:flex;flex-direction:column;gap:2px;padding:7px 9px;border-left:2px solid var(--border2);background:rgba(10,18,32,.5)}
+.doc .t{font-size:12px;color:var(--text)}
+.doc .s{font-family:var(--mono);font-size:9px;color:var(--muted)}
+.wiki .q{font-family:var(--mono);font-size:10px;color:var(--accent)}
+.wiki .ai{font-size:12px;line-height:1.55;color:var(--muted);border-left:2px solid var(--accent2);padding:7px 9px;background:rgba(139,92,246,.06)}
+.wiki .ai code{font-family:var(--mono);font-size:11px;color:var(--accent)}
+.wiki-input{border-top:1px solid rgba(27,42,68,.55)}
+.wiki-input input{width:100%;background:transparent;border:0;color:var(--text);padding:10px 14px;font-family:var(--body);font-size:13px;outline:none}
+
+.workspace{display:flex;flex-direction:column;min-height:0}
+.ws-head{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border);background:rgba(6,11,20,.6)}
+.editor{flex:1;min-height:0;width:100%;background:var(--term-bg);border:0;color:var(--term-fg);font-family:var(--mono);font-size:13px;line-height:1.65;padding:16px 18px;resize:none;outline:none}
+.term-screen{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--term-bg);position:relative}
+.term-body{flex:1;overflow:auto;padding:14px 16px;font-family:var(--mono);font-size:13px;line-height:1.6;color:var(--term-fg)}
+.tline{white-space:pre-wrap;word-break:break-all}
+.tp{color:var(--accent);margin-right:8px}
+.tc.out{color:var(--muted)}
+.term-input{display:flex;align-items:center;padding:10px 16px;border-top:1px solid rgba(27,42,68,.5);font-family:var(--mono);font-size:13px}
+.term-input .tp{margin-right:8px}
+.term-input input{flex:1;background:transparent;border:0;color:var(--term-fg);font-family:var(--mono);font-size:13px;outline:none}
+.term-screen::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);opacity:.35}
+.term-screen::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 58%,rgba(0,0,0,.5) 100%);z-index:2}
+
+.tester{display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--border);background:rgba(6,11,20,.6)}
+.tester-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(27,42,68,.55)}
+.ttitle{font-family:var(--display);font-size:11px;letter-spacing:.16em;color:var(--accent)}
+.tester-head .score{font-family:var(--display);font-size:15px;color:var(--accent)}
+.tester-body{flex:1;overflow:auto;padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.test-row{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;padding:5px 8px;border-left:2px solid transparent;background:rgba(10,18,32,.45)}
+.test-row.ok{border-left-color:var(--pass)}
+.test-row.no{border-left-color:var(--fail)}
+.test-row .ic{width:14px;text-align:center}
+.test-row.ok .ic{color:var(--pass)}
+.test-row.no .ic{color:var(--fail)}
+.test-row .nm{color:var(--muted)}
+.test-row .tag{margin-left:auto;font-size:9px;color:var(--accent2);border:1px solid rgba(139,92,246,.4);padding:1px 5px}
+.empty{color:var(--muted);font-family:var(--mono);font-size:11px;padding:12px}
+
+.overlay{position:fixed;inset:0;background:rgba(3,6,12,.94);display:flex;align-items:center;justify-content:center;z-index:50}
+.overlay .big{font-family:var(--display);font-weight:700;font-size:120px;color:var(--accent);text-shadow:0 0 50px rgba(34,211,238,.55)}
+.overlay .sub{margin-top:10px;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--muted);text-align:center}
+.result-card{padding:26px 34px;display:flex;flex-direction:column;align-items:center;gap:14px;min-width:420px}
+.scores{display:flex;align-items:center;gap:28px}
+.scores .bigscore{font-family:var(--display);font-size:52px;color:var(--muted)}
+.scores .bigscore.win{color:var(--accent);text-shadow:0 0 30px rgba(34,211,238,.4)}
+.verdict{font-family:var(--display);font-size:18px;letter-spacing:.16em;color:var(--warn)}
+.final{flex:1;display:flex;align-items:center;justify-content:center}
+.totals{display:flex;gap:40px;font-family:var(--display);font-size:15px;letter-spacing:.1em}
+.totals b{color:var(--accent);font-size:26px}
+.rtable{border-collapse:collapse;font-family:var(--mono);font-size:11px}
+.rtable td{padding:5px 16px;border-bottom:1px solid rgba(27,42,68,.5);color:var(--muted)}
+.rtable td.me{color:var(--pass)} .rtable td.op{color:var(--fail)}
+
+.mock{position:fixed;right:12px;bottom:12px;z-index:80;width:320px;border:1px dashed rgba(251,191,36,.55);background:rgba(8,12,20,.96);font-family:var(--mono);font-size:10px}
+.mock-head{padding:8px 10px;color:var(--warn);letter-spacing:.15em;cursor:pointer;display:flex;justify-content:space-between}
+.mock-body{padding:10px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px dashed rgba(251,191,36,.3)}
+.mock.collapsed .mock-body{display:none}
+
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--border2)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ============================================================
+   PURE LOGIC (liftable) — the mock's state machine.
+   Question this prototype answers:
+   "Does the lobby -> start -> code/submit -> score flow feel right,
+    and which parts of it must the backend support?"
+   ============================================================ */
+
+const SECTOR = 'HTTP & NETWORKING';
+const ENERGY_MAX = 100, COST_HINT = 2, COST_AI = 12, RECHARGE_SEC = 5;
+
+const ROUNDS = [
+  {
+    tag:'PROTOCOL', title:'HTTP Protocol',
+    brief:`<p>Make your server speak raw HTTP on <code>127.0.0.1:8081</code> (Python) or <code>:8080</code> (C#).</p>
+      <ul><li><code>GET /</code> &rarr; <code>200 OK</code> + <code>Content-Type: text/plain</code></li>
+      <li><code>GET /ping</code> &rarr; body <code>pong</code></li>
+      <li>unknown path &rarr; <code>404</code></li>
+      <li><code>/echo?msg=hi</code> &rarr; body <code>hi</code>; missing <code>msg</code> &rarr; <code>400</code></li></ul>`,
+    hints:`<p>Status line first, then headers, then a blank line, then the body. Read the request line to route. Percent-decode query values.</p>`,
+    tests:[
+      {name:'GET / -> 200 OK', visible:true, pass:true},
+      {name:'GET / Content-Type: text/plain', visible:true, pass:true},
+      {name:'GET /ping -> "pong"', visible:true, pass:true},
+      {name:'GET /nope -> 404', visible:true, pass:true},
+      {name:'GET /echo?msg=hi -> "hi"', visible:true, pass:true},
+      {name:'GET /echo (no msg) -> 400', visible:true, pass:true},
+      {name:'HEAD / -> 200, no body', visible:false, pass:false},
+      {name:'GET // -> 400 or 404', visible:false, pass:true}
+    ]
+  },
+  {
+    tag:'BASIC AUTH', title:'Basic Authorization',
+    brief:`<p>Protect <code>/admin</code> with HTTP Basic auth. Valid user <code>nova:duel</code>.</p>
+      <ul><li>no / wrong credentials &rarr; <code>401</code></li>
+      <li>401 must include <code>WWW-Authenticate: Basic realm="admin"</code></li>
+      <li>valid credentials &rarr; <code>200</code></li>
+      <li>decode <code>base64</code>, split on the first colon, compare</li></ul>`,
+    hints:`<p>The header is <code>Authorization: Basic &lt;base64(user:pass)&gt;</code>. The scheme is case-insensitive. Send the challenge header on every 401.</p>`,
+    tests:[
+      {name:'GET /admin, no auth -> 401', visible:true, pass:true},
+      {name:'GET /admin, wrong user -> 401', visible:true, pass:true},
+      {name:'GET /admin, wrong pass -> 401', visible:true, pass:true},
+      {name:'GET /admin, valid -> 200', visible:true, pass:true},
+      {name:'401 sends WWW-Authenticate', visible:true, pass:false},
+      {name:'POST /admin -> 405', visible:true, pass:true},
+      {name:'GET /other -> 404', visible:true, pass:true},
+      {name:'malformed base64 -> 401', visible:true, pass:false},
+      {name:'scheme "basic" lowercase -> ok', visible:true, pass:true},
+      {name:'empty header value -> 401', visible:false, pass:true},
+      {name:'1KB token -> 401', visible:false, pass:false},
+      {name:'unicode password -> 401', visible:false, pass:true}
+    ]
+  },
+  {
+    tag:'POST REQUEST', title:'POST & JSON',
+    brief:`<p>Accept JSON on <code>POST /echo</code> and return it back.</p>
+      <ul><li>valid JSON &rarr; <code>201</code> + <code>Content-Type: application/json</code></li>
+      <li>malformed JSON &rarr; <code>400</code>; wrong content-type &rarr; <code>415</code></li>
+      <li>body larger than 1MB &rarr; <code>413</code></li>
+      <li>GET on <code>/echo</code> &rarr; <code>405</code></li></ul>`,
+    hints:`<p>Read <code>Content-Length</code>, then read exactly that many bytes. Parse before you route a response. Cap the body size.</p>`,
+    tests:[
+      {name:'POST /echo valid JSON -> 201', visible:true, pass:true},
+      {name:'response echoes the fields', visible:true, pass:true},
+      {name:'Content-Type: application/json', visible:true, pass:true},
+      {name:'wrong content-type -> 415', visible:true, pass:false},
+      {name:'malformed JSON -> 400', visible:true, pass:true},
+      {name:'missing required field -> 422', visible:true, pass:true},
+      {name:'body > 1MB -> 413', visible:true, pass:false},
+      {name:'GET /echo -> 405', visible:true, pass:true},
+      {name:'unicode JSON round-trip', visible:true, pass:true},
+      {name:'empty body -> 400', visible:false, pass:true}
+    ]
+  }
+];
+
+const PY_CODE = `from http.server import BaseHTTPRequestHandler, HTTPServer
+import base64, json
+
+USERS = {"nova": "duel"}
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # TODO: route /admin with Basic auth
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+if __name__ == "__main__":
+    HTTPServer(("127.0.0.1", 8081), Handler).serve_forever()`;
+
+const CS_CODE = `using System.Net;
+
+var listener = new HttpListener();
+listener.Prefixes.Add("http://localhost:8080/");
+listener.Start();
+
+while (true)
+{
+    var ctx = listener.GetContext();
+    // TODO: route /admin with Basic auth
+    ctx.Response.StatusCode = 200;
+    ctx.Response.Close();
+}`;
+
+const OPP_LINES = ['ready when you are', 'this one is tricky', 'my server is up', 'good luck :)', 'submitted, beat that', '401 everywhere lol'];
+
+function initial(){
+  return {
+    screen:'boot', bootLine:0,
+    me:{name:'NOVA', lang:'python', ready:false, submitted:false, score:null, stage:0},
+    opp:{name:'KAI', lang:'csharp', joined:false, ready:false, submitted:false, score:null, stage:0, connected:true},
+    role:null, room:{code:'7F3K', link:'http://100.101.102.103:4318/7F3K'},
+    round:1, totalRounds:3, seed:4821, sector:SECTOR,
+    elapsed:0,
+    wsTab:'editor', leftTab:'comms', hintsOpen:false, energy:ENERGY_MAX, hintsPaid:false, chat:[], wiki:[], term:[{t:'HTTP DUEL shell - mock. type "help".'}],
+    ranTests:false, final:false, serverUp:false, oppTick:0,
+    rounds:[], countdown:3, mockOpen:true
+  };
+}
+
+function sys(chat, text){ chat.push({sys:true, text}); }
+function startRound(s){
+  s.screen='match'; s.elapsed=0; s.ranTests=false; s.final=false; s.hintsOpen=false; s.hintsPaid=false;
+  s.me.submitted=false; s.me.score=null; s.me.stage=0;
+  s.opp.submitted=false; s.opp.score=null; s.opp.stage=0; s.oppTick=0;
+  s.serverUp=false;
+  s.term=[{t:'HTTP DUEL shell - round '+s.round+'. type "help".'}];
+  s.chat=[]; sys(s.chat,'ROUND '+s.round+' STARTED - '+ROUNDS[s.round-1].tag);
+}
+function mePass(s){ return ROUNDS[s.round-1].tests.filter(t=>t.pass).length; }
+function oppPass(s){ const tot=ROUNDS[s.round-1].tests.length; const sc=[0,.4,.65,.85,1][s.opp.stage]||0; return Math.round(tot*sc); }
+function runTests(s){
+  const R=ROUNDS[s.round-1]; s.ranTests=true;
+  const v=R.tests.filter(t=>t.visible), p=v.filter(t=>t.pass).length, f=v.length-p;
+  s.me.stage=Math.max(1, Math.min(3, 1+Math.floor(3*p/v.length)));
+  s.term.push({t:'probing :'+(s.me.lang==='python'?'8081':'8080')+' ...'});
+  s.term.push({t:'visible suite: '+p+' passed, '+f+' failed'});
+}
+function submit(s){
+  if(s.me.submitted) return;
+  s.me.submitted=true; s.me.stage=4; s.final=true; s.ranTests=true; s.me.score=mePass(s);
+  s.term.push({t:'submitting - running full suite (visible + hidden) ...'});
+  sys(s.chat,'YOU SUBMITTED');
+  maybeResolve(s);
+}
+function maybeResolve(s){
+  if(s.screen==='match' && s.me.submitted && s.opp.submitted){
+    s.opp.score=oppPass(s);
+    s.rounds.push({round:s.round, me:s.me.score, opp:s.opp.score});
+    sys(s.chat,'ROUND '+s.round+' - YOU '+s.me.score+' / '+s.opp.name+' '+s.opp.score);
+    s.screen='roundResult';
+  }
+}
+function tick(s){
+  if(s.screen!=='match') return;
+  s.elapsed++;
+  if(s.elapsed%RECHARGE_SEC===0) s.energy=Math.min(ENERGY_MAX, s.energy+1);
+  if(!s.opp.submitted && s.opp.connected){
+    s.oppTick++;
+    if(s.oppTick%30===0){
+      if(s.opp.stage<4){ s.opp.stage++; sys(s.chat,s.opp.name+' REACHED STAGE '+s.opp.stage+'/4'); }
+      else { s.opp.submitted=true; sys(s.chat,s.opp.name+' SUBMITTED'); }
+    }
+  }
+  maybeResolve(s);
+}
+function termInput(s, val){
+  const cmd=(val||'').trim(); if(!cmd) return;
+  s.term.push({p:'PS C:\\duel\\r'+s.round+'>', t:cmd});
+  const c=cmd.toLowerCase();
+  if(c==='help') s.term.push({t:'commands: python server.py | duel judge | duel submit | clear'});
+  else if(c.includes('server.py')||c.includes('dotnet run')||c==='run'){ s.serverUp=true; s.me.stage=Math.max(s.me.stage,1); s.term.push({t:'listening on :'+(s.me.lang==='python'?'8081':'8080')}); }
+  else if(c==='duel judge') runTests(s);
+  else if(c==='duel submit') submit(s);
+  else if(c==='clear') s.term=[];
+  else s.term.push({t:'command not found: '+cmd});
+}
+
+function reduce(s0, a){
+  const s=structuredClone(s0);
+  switch(a.type){
+    case 'BOOT': if(s.bootLine>=2) s.screen='lobby'; else s.bootLine++; break;
+    case 'SKIP_BOOT': s.screen='lobby'; break;
+    case 'SET_LANG': s.me.lang=a.value; break;
+    case 'CREATE_ROOM': s.role='host'; sys(s.chat,'ROOM '+s.room.code+' CREATED'); break;
+    case 'JOIN_ROOM': s.role='guest'; sys(s.chat,'JOINED ROOM '+s.room.code); break;
+    case 'OPP_JOIN': s.opp.joined=true; sys(s.chat,s.opp.name+' JOINED'); break;
+    case 'TOGGLE_READY': s.me.ready=!s.me.ready; sys(s.chat,'YOU '+(s.me.ready?'READY':'STOOD DOWN')); break;
+    case 'OPP_READY': s.opp.ready=true; sys(s.chat,s.opp.name+' READY'); break;
+    case 'START': s.screen='countdown'; s.countdown=3; break;
+    case 'COUNT': s.countdown=Math.max(0,s.countdown-1); break;
+    case 'MATCH_BEGIN': startRound(s); break;
+    case 'TICK': tick(s); break;
+    case 'WS_TAB': s.wsTab=a.value; break;
+    case 'TOGGLE_HINTS':
+      if(!s.hintsOpen && !s.hintsPaid && s.energy>=COST_HINT){ s.energy-=COST_HINT; s.hintsPaid=true; }
+      s.hintsOpen=!s.hintsOpen; break;
+    case 'LEFT_TAB': s.leftTab=a.value; break;
+    case 'ASK':
+      if(s.energy<COST_AI){ s.wiki.push({q:a.value, a:'Not enough energy &mdash; '+s.energy+' left, '+COST_AI+' needed.'}); break; }
+      s.energy-=COST_AI; s.wiki.push({q:a.value, a:aiAnswer(a.value)}); break;
+    case 'VSCODE': s.term.push({t:'> code -r C:\\duel\\r'+s.round}); sys(s.chat,'WORKSPACE OPENED IN VS CODE'); break;
+    case 'RUN_TESTS': runTests(s); break;
+    case 'SUBMIT': submit(s); break;
+    case 'NEXT': if(s.round<s.totalRounds){ s.round++; s.screen='countdown'; s.countdown=3; } else { s.screen='matchResult'; } break;
+    case 'TERM_INPUT': termInput(s,a.value); break;
+    case 'SEND_CHAT': s.chat.push({who:s.me.name||'YOU', text:a.value, me:true}); break;
+    case 'OPP_CHAT': s.chat.push({who:s.opp.name, text:OPP_LINES[Math.floor(Math.random()*OPP_LINES.length)]}); break;
+    case 'OPP_STAGE': s.opp.stage=Math.min(4,s.opp.stage+1); sys(s.chat,s.opp.name+' STAGE '+s.opp.stage+'/4'); break;
+    case 'OPP_SUBMIT': if(!s.opp.submitted){ s.opp.submitted=true; s.opp.stage=4; sys(s.chat,s.opp.name+' SUBMITTED'); maybeResolve(s);} break;
+    case 'TOGGLE_CONN': s.opp.connected=!s.opp.connected; sys(s.chat, s.opp.connected? s.opp.name+' RECONNECTED' : s.opp.name+' DISCONNECTED - RECONNECTING'); break;
+    case 'SKIP': s.me.name=s.me.name||'NOVA'; s.role=s.role||'host'; startRound(s); break;
+    case 'MOCK_TOGGLE': s.mockOpen=!s.mockOpen; break;
+  }
+  return s;
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+const fmt=t=>String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+
+function testRow(t){
+  return `<div class="test-row ${t.pass?'ok':'no'}"><span class="ic">${t.pass?'\u2713':'\u2717'}</span><span class="nm">${t.name}</span>${t.visible?'':'<span class="tag">hidden</span>'}</div>`;
+}
+function pcard(p, opts){
+  opts=opts||{};
+  const stage=opts.stage?`<span class="stage">${[1,2,3,4].map(i=>`<i class="${i<=p.stage?'on':''}"></i>`).join('')}</span>`:'';
+  return `<div class="pcard"><span class="pname">${p.name||'YOU'}</span><span class="lang">${p.lang==='python'?'PY':'C#'}</span>${stage}${p.submitted?'<span class="chip lock">SUBMITTED</span>':''}${p.score!=null?`<span class="chip score">${p.score}</span>`:''}</div>`;
+}
+function energyGauge(s){
+  const pct=Math.max(0,Math.min(100,Math.round(100*s.energy/ENERGY_MAX)));
+  const lvl=s.energy<25?'crit':s.energy<50?'low':'';
+  return `<span class="ezap ${lvl}" title="energy · +1 every ${RECHARGE_SEC}s">&#9889;</span><span class="emeter ${lvl}"><i style="width:${pct}%"></i></span><span class="ev ${lvl}">${s.energy}</span>`;
+}
+function connDot(p){
+  const c=p.connected?'on':'rec', label=p.connected?'CONNECTED':'RECONNECTING';
+  return `<span class="conn"><span class="dot ${c}"></span><span class="k">${label}</span></span>`;
+}
+function hud(s){
+  const R=ROUNDS[s.round-1];
+  return `<header class="hud">
+    <span class="brand">&#9672; HTTP DUEL</span><span class="sep">|</span>
+    <span class="k">${s.sector}</span><span class="sep">|</span>
+    <span class="k">SEED ${s.seed}</span>
+    <span class="k">R${s.round}/${s.totalRounds} &middot; ${R.tag}</span>
+    <span class="spacer"></span>
+    ${pcard(s.me,{stage:true})}<span class="vs">VS</span>${pcard(s.opp,{stage:true})}
+    <span class="sep">|</span>${connDot(s.opp)}
+    <span class="sep">|</span>${energyGauge(s)}
+    <span class="sep">|</span><span class="clock">${fmt(s.elapsed)}</span>
+  </header>`;
+}
+function commsBody(s){
+  return `<div class="chat-log" id="chat-log">${s.chat.map(m=> m.sys?`<div class="msg sys">${m.text}</div>`:`<div class="msg ${m.me?'me':''}"><span class="who">${m.who}</span>${m.text}</div>`).join('')}</div>
+    <div class="chat-input"><input id="chatinput" data-focus="chat" placeholder="message...  /  system log appears here" autocomplete="off"/></div>`;
+}
+const WIKI_DOCS = [
+  ['Python · http.server.BaseHTTPRequestHandler','context7'],
+  ['HTTP Authorization header / Basic scheme','MDN'],
+  ['base64 — encode & decode','Python docs'],
+  ['C# · System.Net.HttpListener','learn.microsoft.com'],
+  ['401 / 405 / 415 responses','RFC 9110']
+];
+function aiAnswer(q){
+  const t=q.toLowerCase();
+  if(t.includes('www-authenticate')||t.includes('401')) return 'Send <code>401</code> with <code>WWW-Authenticate: Basic realm="admin"</code> on every rejected request — clients need the challenge to retry.';
+  if(t.includes('base64')) return 'Decode after stripping the <code>Basic </code> prefix, then split on the first colon: <code>base64.b64decode(v).split(b":",1)</code>.';
+  if(t.includes('json')||t.includes('post')) return 'Read <code>Content-Length</code>, read exactly that many bytes, then parse. Malformed &rarr; <code>400</code>, wrong content-type &rarr; <code>415</code>.';
+  if(t.includes('404')||t.includes('route')) return 'Match the request path exactly; anything unknown returns <code>404</code>. Keep routing in one place.';
+  return 'Round tip: every bullet in the spec maps to a visible or hidden test. (mock AI answer)';
+}
+function wikiPanel(s){
+  return `<div class="wiki">
+    <span class="src">WIKI · context7 (mock)</span>
+    ${WIKI_DOCS.map(d=>`<div class="doc"><span class="t">${d[0]}</span><span class="s">${d[1]}</span></div>`).join('')}
+  </div>`;
+}
+function aiPanel(s){
+  const answers=s.wiki.map(w=>`<div class="q">&gt; ${w.q}</div><div class="ai">${w.a}</div>`).join('');
+  return `<div class="wiki">
+    <span class="src">NIVIX · <span class="energy">&#9889; ${s.energy}/${ENERGY_MAX}</span> · ${COST_AI}&#9889; per question · +1&#9889; / ${RECHARGE_SEC}s</span>
+    ${s.wiki.length?answers:`<div class="ai">Consult nivix about this round &mdash; headers, status codes, base64, JSON. Each answer costs ${COST_AI}&#9889;.</div>`}
+  </div>
+  <div class="wiki-input"><input id="aiinput" data-focus="ai" placeholder="ask nivix (&minus;${COST_AI}&#9889;)" autocomplete="off"/></div>`;
+}
+function leftPanel(s){
+  const tab=(id,label)=>`<button class="tab ${s.leftTab===id?'on':''}" data-act="LEFT_TAB" data-val="${id}">${label}</button>`;
+  return `<div class="chat">
+    <div class="chat-head">
+      ${tab('comms','COMMS')}${tab('wiki','WIKI')}${tab('ai','NIVIX')}
+      <span class="spacer"></span><span class="k">${s.opp.name}</span>
+    </div>
+    ${s.leftTab==='wiki'?wikiPanel(s):s.leftTab==='ai'?aiPanel(s):commsBody(s)}
+  </div>`;
+}
+function term(s){
+  const prompt='PS C:\\duel\\r'+s.round+'>';
+  const lines=s.term.map(l=> l.p?`<div class="tline"><span class="tp">${l.p}</span><span class="tc">${l.t}</span></div>`:`<div class="tline"><span class="tc out">${l.t}</span></div>`).join('');
+  return `<div class="term-screen"><div class="term-body" id="term-body">${lines}</div>
+    <div class="term-input"><span class="tp">${prompt}</span><input id="terminput" data-focus="term" autocomplete="off" spellcheck="false"/></div></div>`;
+}
+function workspace(s){
+  const file=s.me.lang==='python'?'server.py':'Program.cs';
+  const shell=s.me.lang==='python'?'PowerShell · python 3.12':'PowerShell · dotnet 8';
+  const body=s.wsTab==='terminal' ? term(s) : `<textarea class="editor" spellcheck="false">${s.me.lang==='python'?PY_CODE:CS_CODE}</textarea>`;
+  return `<div class="workspace">
+    <div class="ws-head">
+      <button class="tab ${s.wsTab==='editor'?'on':''}" data-act="WS_TAB" data-val="editor">EDITOR</button>
+      <button class="tab ${s.wsTab==='terminal'?'on':''}" data-act="WS_TAB" data-val="terminal">TERMINAL</button>
+      <span class="k">${file}</span>
+      <span class="spacer"></span><span class="k">${shell}</span>
+      <button class="btn" data-act="VSCODE">OPEN IN VS CODE</button>
+    </div>${body}
+  </div>`;
+}
+function tester(s){
+  const R=ROUNDS[s.round-1];
+  const showAll=s.final;
+  const rows=(s.ranTests||showAll)
+    ? R.tests.filter(t=>t.visible||showAll).map(testRow).join('')
+    : `<div class="empty">RUN TESTS to preview the visible suite</div>`;
+  const score=s.me.score!=null?`${s.me.score}/${R.tests.length}`:'\u2014';
+  return `<div class="tester">
+    <div class="tester-head">
+      <span class="ttitle">TESTER</span>
+      <button class="btn exec" data-act="RUN_TESTS">RUN TESTS</button>
+      <button class="btn warn" data-act="SUBMIT" ${s.me.submitted?'disabled':''}>SUBMIT</button>
+      <span class="spacer"></span>
+      ${s.me.submitted?'<span class="chip lock">SUBMITTED</span>':''}
+      <span class="k">SCORE</span><span class="score">${score}</span>
+    </div>
+    <div class="tester-body">${rows}</div>
+  </div>`;
+}
+function renderMatch(s){
+  const R=ROUNDS[s.round-1];
+  return `${hud(s)}<div class="match">
+    <section class="col-left">
+      <div class="brief panel"><h1>${R.title}</h1>${R.brief}
+        <button class="hints-toggle" data-act="TOGGLE_HINTS">HINTS <span>${s.hintsOpen?'\u25be':'\u25b8'}</span>${s.hintsPaid?'':' <span class="cost">&minus;'+COST_HINT+'&#9889;</span>'}</button>
+        ${s.hintsOpen?`<div class="hints-block">${R.hints}</div>`:''}
+      </div>
+      ${leftPanel(s)}
+    </section>
+    <section class="col-right">${workspace(s)}${tester(s)}</section>
+  </div>`;
+}
+function renderBoot(s){
+  const L=['SYS:ONLINE','MOUNTING '+SECTOR,'LINK ESTABLISHED'];
+  return `<div class="screen boot-screen" data-act="SKIP_BOOT">
+    <div class="boot">${L.slice(0,s.bootLine+1).map(x=>`<div>&gt; ${x}</div>`).join('')}<div class="caret">\u2588</div></div>
+    <div class="hint">click to skip</div>
+  </div>`;
+}
+function renderCountdown(s){
+  const big=s.countdown>0?s.countdown:'GO';
+  return `<div class="overlay"><div class="big">${big}</div><div class="sub">ROUND ${s.round} // ${ROUNDS[s.round-1].tag}</div></div>`;
+}
+function renderRoundResult(s){
+  const r=s.rounds[s.rounds.length-1];
+  const v=r.me>r.opp?'ROUND WON':r.me<r.opp?'ROUND LOST':'ROUND DRAWN';
+  return `<div class="overlay"><div class="result-card panel">
+    <div class="k">ROUND ${r.round} RESULT</div>
+    <div class="scores"><div><div style="font-family:var(--display);font-size:13px">YOU</div><div class="bigscore ${r.me>=r.opp?'win':''}">${r.me}</div></div>
+      <span class="vs">VS</span>
+      <div><div style="font-family:var(--display);font-size:13px">${s.opp.name}</div><div class="bigscore ${r.opp>=r.me?'win':''}">${r.opp}</div></div></div>
+    <div class="verdict">${v}</div>
+    <button class="btn exec" data-act="NEXT">${s.round<s.totalRounds?'NEXT ROUND':'SEE FINAL'}</button>
+  </div></div>`;
+}
+function renderFinal(s){
+  const me=s.rounds.reduce((a,r)=>a+r.me,0), opp=s.rounds.reduce((a,r)=>a+r.opp,0);
+  const v=me>opp?'MATCH WON':me<opp?'MATCH LOST':'MATCH DRAWN';
+  const rows=s.rounds.map(r=>`<tr><td>ROUND ${r.round}</td><td>${ROUNDS[r.round-1].tag}</td><td class="me">${r.me}</td><td class="op">${r.opp}</td></tr>`).join('');
+  return `<header class="hud"><span class="brand">&#9672; HTTP DUEL</span><span class="sep">|</span><span class="k">${s.sector}</span><span class="sep">|</span><span class="k">MATCH COMPLETE</span><span class="spacer"></span><span class="k">${s.opp.name}</span></header>
+  <div class="final"><div class="result-card panel">
+    <div class="k">FINAL</div><div class="verdict">${v}</div>
+    <div class="totals"><span>YOU <b>${me}</b></span><span>${s.opp.name} <b>${opp}</b></span></div>
+    <table class="rtable"><tbody>${rows}</tbody></table>
+    <div class="k">SEASON 0W / 0L (mock)</div>
+    <button class="btn exec" data-act="REMATCH">REMATCH</button>
+  </div></div>`;
+}
+function renderLobby(s){
+  const seg=(l,label)=>`<button class="seg ${s.me.lang===l?'on':''}" data-act="SET_LANG" data-val="${l}">${label}</button>`;
+  const role=s.role?`
+    <div class="room-panel panel"><span class="k">ROOM</span><span class="code">${s.room.code}</span>
+      <span class="k">LINK</span><span class="link">${s.room.link}</span></div>
+    <div class="players">
+      <div class="panel pcard-lg"><span class="pname">${s.me.name||'NOVA'}</span><span class="lang">${s.me.lang==='python'?'PY':'C#'}</span>${s.me.ready?'<span class="chip ok">READY</span>':'<span class="chip">NOT READY</span>'}<span class="spacer"></span><button class="btn" data-act="TOGGLE_READY">${s.me.ready?'UNREADY':'READY'}</button></div>
+      <span class="vs">VS</span>
+      <div class="panel pcard-lg"><span class="pname">${s.opp.joined?s.opp.name:'WAITING...'}</span><span class="lang">${s.opp.joined?(s.opp.lang==='python'?'PY':'C#'):''}</span>${s.opp.ready?'<span class="chip ok">READY</span>':''}</div>
+    </div>
+    <div class="lobby-actions">${s.role==='host'
+      ? `<button class="btn exec" data-act="START" ${s.me.ready&&s.opp.ready?'':'disabled'}>START MATCH</button>`
+      : `<span class="k">WAITING FOR HOST TO START</span>`}</div>`
+  :`<div class="join-grid">
+      <div class="panel join-card"><div class="k">HOST MATCH</div><p>Create a room and share the code or join link.</p><button class="btn exec" data-act="CREATE_ROOM">CREATE ROOM</button></div>
+      <div class="panel join-card"><div class="k">JOIN MATCH</div><p>Enter a room code (same LAN) or paste a join link.</p><input id="codeinput" placeholder="7F3K" autocomplete="off"/><button class="btn exec" data-act="JOIN_ROOM">JOIN ROOM</button></div>
+    </div>`;
+  return `<div class="screen lobby"><div class="lobby-wrap">
+    <div class="lobby-title">&#9672; HTTP DUEL <span class="k">// LOBBY</span></div>
+    <div class="panel profile">
+      <div class="field"><label>CALLSIGN</label><input id="nameinput" data-focus="name" value="${s.me.name||''}" placeholder="NOVA" autocomplete="off"/></div>
+      <div class="field"><label>LANGUAGE</label><div class="seg-group">${seg('python','PYTHON')}${seg('csharp','C#')}</div></div>
+    </div>
+    ${role}
+  </div></div>`;
+}
+function renderMock(s){
+  return `<div class="mock ${s.mockOpen?'':'collapsed'}">
+    <div class="mock-head" data-act="MOCK_TOGGLE">MOCK CONTROLS / drive the opponent <span>${s.mockOpen?'\u25be':'\u25b8'}</span></div>
+    <div class="mock-body">
+      <button class="btn" data-act="OPP_JOIN">OPP JOIN</button>
+      <button class="btn" data-act="OPP_READY">OPP READY</button>
+      <button class="btn" data-act="OPP_STAGE">STAGE +1</button>
+      <button class="btn" data-act="OPP_SUBMIT">OPP SUBMIT</button>
+      <button class="btn" data-act="OPP_CHAT">OPP CHAT</button>
+      <button class="btn" data-act="TOGGLE_CONN">TOGGLE CONN</button>
+      <button class="btn" data-act="SKIP">SKIP TO MATCH</button>
+      <button class="btn danger" data-act="RESET">RESET</button>
+    </div>
+  </div>`;
+}
+function render(s){
+  let body='';
+  if(s.screen==='boot') body=renderBoot(s);
+  else if(s.screen==='lobby') body=renderLobby(s);
+  else if(s.screen==='match') body=renderMatch(s);
+  else if(s.screen==='matchResult') body=renderFinal(s);
+  const overlay=s.screen==='countdown'?renderCountdown(s):s.screen==='roundResult'?renderRoundResult(s):'';
+  return `<div class="proto">PROTOTYPE / HTTP DUEL UX MOCK / fake data, no backend / drive the flow with MOCK CONTROLS (bottom-right)</div>${body}${overlay}${renderMock(s)}`;
+}
+
+/* ============================================================
+   PAGE (thin shell — no game logic here)
+   ============================================================ */
+let state=initial(), last='', acc={boot:0,count:0,tick:0};
+const app=document.getElementById('app');
+
+function paint(){
+  const f=document.activeElement&&document.activeElement.dataset?document.activeElement.dataset.focus:null;
+  app.innerHTML=render(state);
+  if(f){ const el=app.querySelector('[data-focus="'+f+'"]'); if(el) el.focus(); }
+  const tb=document.getElementById('term-body'); if(tb) tb.scrollTop=tb.scrollHeight;
+  const cl=document.getElementById('chat-log'); if(cl) cl.scrollTop=cl.scrollHeight;
+}
+function dispatch(a){
+  state=reduce(state,a); paint();
+  if(a.type==='CREATE_ROOM'||a.type==='JOIN_ROOM'){
+    setTimeout(()=>dispatch({type:'OPP_JOIN'}),1200);
+    setTimeout(()=>dispatch({type:'OPP_READY'}),2600);
+  }
+}
+app.addEventListener('input',e=>{ if(e.target.id==='nameinput') state.me.name=e.target.value; });
+app.addEventListener('keydown',e=>{
+  if(e.key!=='Enter') return;
+  if(e.target.id==='terminput'){ const v=e.target.value; e.target.value=''; dispatch({type:'TERM_INPUT',value:v}); }
+  if(e.target.id==='chatinput'){ const v=e.target.value.trim(); if(v){ e.target.value=''; dispatch({type:'SEND_CHAT',value:v}); setTimeout(()=>dispatch({type:'OPP_CHAT'}),1200+Math.random()*1200);} }
+  if(e.target.id==='aiinput'){ const v=e.target.value.trim(); if(v){ e.target.value=''; dispatch({type:'ASK',value:v}); } }
+});
+app.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]');
+  if(!t) return;
+  const type=t.dataset.act;
+  if(type==='RESET'){ state=initial(); paint(); return; }
+  if(type==='REMATCH'){ state=initial(); state.screen='lobby'; paint(); return; }
+  dispatch({type, value:t.dataset.val});
+});
+
+setInterval(()=>{
+  if(state.screen!==last){ last=state.screen; acc={boot:0,count:0,tick:0}; }
+  if(state.screen==='boot'){ acc.boot+=250; if(acc.boot>=600){ acc.boot=0; dispatch({type:'BOOT'}); } }
+  else if(state.screen==='countdown'){ acc.count+=250; if(acc.count>=800){ acc.count=0; dispatch({type:state.countdown>0?'COUNT':'MATCH_BEGIN'}); } }
+  else if(state.screen==='match'){ acc.tick+=250; if(acc.tick>=1000){ acc.tick=0; dispatch({type:'TICK'}); } }
+},250);
+
+paint();
+</script>
+</body>
+</html>

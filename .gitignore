@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+web/dist/
+web/node_modules/.vite/
+*.tsbuildinfo
+
+# agent runtime
+agent/workspace/**/bin/
+agent/workspace/**/obj/
+agent/workspace/**/.vs/
+agent/logs/
+
+# vendored reference clones (cherry-picked components already live in web/src/components/ui)
+vendor/
+
+# misc
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db

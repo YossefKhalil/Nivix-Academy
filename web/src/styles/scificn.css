@@ -1,0 +1,343 @@
+/* scificn/ui tokens — vendored from github.com/baxy5/scificn-ui
+   (src/styles/globals.css). Trimmed to tokens + a "holo" cyan/blue theme
+   we map onto Cosmic UI's palette (no green, per the design decision).
+   The global body/reset rules were dropped so Cosmic UI's shell stays
+   the base; scificn supplies the terminal/panel surfaces. */
+
+@theme {
+  --color-pink: #b53082;
+  --color-purple: #381b57;
+  --color-orange: #f2963a;
+  --color-teal: #7fc8a9;
+  --color-beige: #c8b99a;
+  --color-navy: #11161f;
+  --color-void: #07050f;
+
+  --color-green: #6f9ff5;
+  --color-amber: #e6b980;
+  --color-amber-light: #f0c99a;
+  --color-red: #e2828f;
+  --color-blue: #8ab4f0;
+  --color-bone: #e0d5be;
+
+  --color-bg: #0b0f15;
+  --color-surface: #10151d;
+  --color-surface-raised: #161c26;
+
+  --font-mono: "Source Code Pro", ui-monospace, "Courier New", monospace;
+  --radius: 0px;
+}
+
+:root {
+  --background: #0b0f15;
+  --surface: #10151d;
+  --surface-raised: #161c26;
+  --border: #232c3a;
+  --border-active: #6f9ff5;
+  --text-primary: #e7edf6;
+  --text-secondary: #a8b6c9;
+  --text-muted: #64738b;
+  --text-warning: #e6b980;
+  --text-danger: #e2828f;
+  --accent-primary: #6f9ff5;
+  --accent-secondary: #e6b980;
+  --accent-warning: #e6b980;
+  --glow-teal: 0 0 8px #7fc8a966, 0 0 20px #7fc8a933;
+  --glow-pink: 0 0 8px #b5308266, 0 0 20px #b5308233;
+  --glow-orange: 0 0 8px #f2963a66, 0 0 20px #f2963a33;
+  --glow-green: 0 0 8px #6f9ff566, 0 0 20px #6f9ff533;
+  --glow-amber: 0 0 8px #e6b98066, 0 0 20px #e6b98033;
+  --glow-red: 0 0 8px #e2828f66, 0 0 20px #e2828f33;
+  --glow-blue: 0 0 8px #8ab4f066, 0 0 20px #8ab4f033;
+  --text-glow-green: 0 0 6px #6f9ff599, 0 0 14px #6f9ff555;
+  --text-glow-amber: 0 0 6px #e6b98099, 0 0 14px #e6b98055;
+  --text-glow-red: 0 0 6px #e2828f99, 0 0 14px #e2828f55;
+  --text-glow-blue: 0 0 6px #8ab4f099, 0 0 14px #8ab4f055;
+
+  --clip-corner-sm: polygon(6px 0%, 100% 0%, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0% 100%, 0% 6px);
+  --clip-corner-md: polygon(10px 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%, 0% 10px);
+  --clip-corner-lg: polygon(16px 0%, 100% 0%, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0% 100%, 0% 16px);
+  --border-width: 1px;
+}
+
+/* Graphite + steel-blue palette (professional, low-saturation). */
+[data-theme="holo"] {
+  --color-green: #6f9ff5;
+  --color-amber: #e6b980;
+  --color-red: #e2828f;
+  --color-blue: #8ab4f0;
+
+  --background: #0b0f15;
+  --surface: #10151d;
+  --surface-raised: #161c26;
+
+  --border: #232c3a;
+  --border-active: #6f9ff5;
+
+  --text-primary: #e7edf6;
+  --text-secondary: #a8b6c9;
+  --text-muted: #64738b;
+  --text-warning: #e6b980;
+  --text-danger: #e2828f;
+
+  --accent-primary: #6f9ff5;
+  --accent-secondary: #e6b980;
+  --accent-warning: #e6b980;
+
+  --glow-green: 0 0 8px rgba(111, 159, 245, 0.35), 0 0 20px rgba(111, 159, 245, 0.16);
+  --glow-amber: 0 0 8px rgba(230, 185, 128, 0.32), 0 0 20px rgba(230, 185, 128, 0.16);
+  --glow-red: 0 0 8px rgba(226, 130, 143, 0.32), 0 0 20px rgba(226, 130, 143, 0.16);
+  --glow-blue: 0 0 8px rgba(138, 180, 240, 0.32), 0 0 20px rgba(138, 180, 240, 0.16);
+  --text-glow-green: 0 0 6px rgba(111, 159, 245, 0.5), 0 0 14px rgba(111, 159, 245, 0.25);
+  --text-glow-amber: 0 0 6px rgba(230, 185, 128, 0.5), 0 0 14px rgba(230, 185, 128, 0.25);
+  --text-glow-red: 0 0 6px rgba(226, 130, 143, 0.5), 0 0 14px rgba(226, 130, 143, 0.25);
+}
+
+@keyframes flicker {
+  0%, 89%, 91%, 93%, 100% { opacity: 1; }
+  90% { opacity: 0.4; }
+  92% { opacity: 0.8; }
+  94% { opacity: 0.6; }
+}
+@keyframes blink-cursor {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes glitch {
+  0%, 100% { transform: translate(0); }
+  10% { transform: translate(-2px, 1px); }
+  20% { transform: translate(2px, -1px); }
+  30% { transform: translate(-1px, 2px); }
+  40% { transform: translate(1px, -1px); }
+  50% { transform: translate(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.scanlines { position: relative; overflow: hidden; }
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.12) 3px,
+    rgba(0, 0, 0, 0.12) 4px
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+.flicker { animation: flicker 8s infinite; }
+.glitch-hover:hover { animation: glitch 0.3s ease-in-out; }
+.pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.clip-corner-sm { clip-path: var(--clip-corner-sm); }
+.clip-corner-md { clip-path: var(--clip-corner-md); }
+.clip-corner-lg { clip-path: var(--clip-corner-lg); }
+
+/* Cosmic UI-style angled nav tabs */
+.navtab {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 9px 20px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+.navtab:hover { color: var(--color-primary); }
+.navtab.active {
+  color: var(--color-primary);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-primary) 24%, transparent),
+    color-mix(in oklab, var(--color-primary) 8%, transparent)
+  );
+}
+.navtab.brand {
+  font-family: var(--font-orbitron);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--color-primary);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-primary) 18%, transparent),
+    transparent
+  );
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  padding-left: 16px;
+  padding-right: 26px;
+}
+
+/* Angular micro-actions (connected groups + standalone) */
+.micro {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 0;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition: color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.micro:hover {
+  color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary), 0 0 10px color-mix(in oklab, var(--color-primary) 18%, transparent);
+}
+.micro.primary {
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 55%, transparent);
+}
+.micro.primary:hover {
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent), 0 0 10px color-mix(in oklab, var(--color-accent) 18%, transparent);
+}
+.micro:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.micro.vscode {
+  color: #35b6ff;
+  background: color-mix(in oklab, #35b6ff 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, #35b6ff 55%, transparent);
+}
+.micro.vscode:hover {
+  color: #8fd8ff;
+  background: color-mix(in oklab, #35b6ff 14%, transparent);
+  box-shadow: inset 0 0 0 1px #35b6ff, 0 0 12px color-mix(in oklab, #35b6ff 30%, transparent);
+}
+
+.microgroup {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--color-primary) 8%, transparent), transparent);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 28%, transparent);
+}
+.microgroup .micro { clip-path: none; box-shadow: none; color: var(--color-primary); }
+.microgroup .micro.primary { color: var(--color-accent); }
+.microgroup .micro:hover { background: color-mix(in oklab, var(--color-primary) 14%, transparent); color: #8fe9f5; }
+.microgroup .micro.primary:hover { background: color-mix(in oklab, var(--color-accent) 16%, transparent); color: #ff9a7a; }
+.microgroup .micro:disabled { color: var(--text-muted); background: transparent; }
+
+.inputgroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 3px 2px 10px;
+  background: var(--background);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.inputgroup:focus-within {
+  box-shadow: inset 0 0 0 1px var(--color-primary), 0 0 10px color-mix(in oklab, var(--color-primary) 14%, transparent);
+}
+.inputgroup .micro { clip-path: none; box-shadow: none; }
+
+/* Cosmic UI-inspired panel skin: clean 1px frame, gradient fill,
+   short glowing accent tick. No chamfers — they read as clunky at this scale. */
+.cosmic-panel {
+  position: relative;
+  border: 1px solid color-mix(in oklab, var(--color-primary) 32%, transparent) !important;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-primary) 7%, transparent),
+      transparent 30%
+    ),
+    color-mix(in oklab, var(--surface) 96%, black) !important;
+  border-radius: 3px !important;
+  clip-path: none !important;
+  box-shadow: inset 0 0 24px color-mix(in oklab, var(--color-primary) 4%, transparent) !important;
+}
+.cosmic-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  width: 54px;
+  height: 2px;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--color-primary) 65%, transparent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── motion / polish ───────────────────────────────── */
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(10px); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0); filter: none; }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes count-pop {
+  0% { opacity: 0; transform: scale(1.6); filter: blur(6px); }
+  35% { opacity: 1; transform: scale(1); filter: none; }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes tick-in {
+  from { transform: scaleY(0.2); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.anim-in { animation: panel-in 0.5s cubic-bezier(0.2, 0.75, 0.2, 1) both; }
+.anim-in-slow { animation: panel-in 0.8s cubic-bezier(0.2, 0.75, 0.2, 1) both; }
+.overlay-in { animation: overlay-in 0.35s ease-out both; }
+.count-pop { animation: count-pop 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.tick-in { animation: tick-in 0.3s ease-out both; transform-origin: center; }
+.rise-in { animation: rise 0.4s ease-out both; }
+
+/* Lobby live server-room backdrop: slow fade + settle. */
+@keyframes lobby-video-in {
+  from { opacity: 0; transform: scale(1.05); }
+  to { opacity: 0.55; transform: scale(1); }
+}
+.lobby-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  animation: lobby-video-in 3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Screen-change fade for smooth transitions. */
+@keyframes screen-fade {
+  0% { opacity: 0.92; }
+  100% { opacity: 0; }
+}
+.screen-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  pointer-events: none;
+  background: var(--background);
+  animation: screen-fade 0.5s ease-out both;
+}
+
+.text-glow { text-shadow: var(--text-glow-green); }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-in, .anim-in-slow, .overlay-in, .count-pop, .tick-in, .rise-in, .screen-fade {
+    animation: none !important;
+  }
+  .lobby-video { animation: none !important; opacity: 0.55; }
+}

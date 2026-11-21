@@ -1,0 +1,79 @@
+/* Cosmic UI design tokens — vendored from github.com/rizznme/cosmic-ui
+   (src/styles/global.css). Trimmed: no Tailwind import, no site-only
+   @source glob, no external asset background-images. */
+
+@theme {
+  /* Professional graphite + soft steel-blue palette. */
+  --color-primary: #6f9ff5;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #e6b980;
+  --color-accent-foreground: #061320;
+  --color-secondary: --alpha(
+    color-mix(in oklab, var(--color-primary), var(--color-white) 50%) / 60%
+  );
+  --color-secondary-foreground: color-mix(
+    in oklab, var(--color-primary), var(--color-white) 70%
+  );
+  --color-destructive: #e2828f;
+  --color-destructive-foreground: #ffffff;
+  --color-success: #7fc8a9;
+  --color-success-foreground: #061320;
+  --color-background: #0b0f15;
+  --color-foreground: var(--color-white);
+
+  --font-orbitron: "Orbitron", "Titillium Web", sans-serif;
+  --font-roboto: "Titillium Web", sans-serif;
+
+  --text-xs: 0.59375rem;
+  --text-sm: 0.71875rem;
+  --text-base: 0.84375rem;
+  --text-lg: 0.96875rem;
+  --text-xl: 1.09375rem;
+  --text-2xl: 1.28125rem;
+  --text-3xl: 1.65625rem;
+  --text-4xl: 2.03125rem;
+}
+
+@utility container {
+  max-width: 92rem;
+}
+
+body {
+  @apply bg-background overflow-x-hidden bg-fixed antialiased text-sm font-orbitron text-foreground tracking-wider;
+  background-image: repeating-linear-gradient(
+      0deg,
+      --alpha(var(--color-foreground) / 5%) 0,
+      --alpha(var(--color-foreground) / 5%) 1px,
+      transparent 1px,
+      transparent 35rem
+    ),
+    repeating-linear-gradient(
+      90deg,
+      --alpha(var(--color-foreground) / 5%) 0,
+      --alpha(var(--color-foreground) / 5%) 1px,
+      transparent 1px,
+      transparent 35rem
+    );
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: --alpha(var(--color-foreground) / 10%) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background-color: --alpha(var(--color-foreground) / 10%);
+}

@@ -1,0 +1,5 @@
+{
+  "framework": "react",
+  "componentsDir": "src/components",
+  "alias": "@/components"
+}
