@@ -37,12 +37,12 @@ export async function getAgentStatus(timeoutMs = 1200): Promise<AgentStatus | nu
 }
 
 /** Returns null when no agent is reachable (caller should fall back to mock). */
-export async function openInEditor(file?: string): Promise<EditorResult | null> {
+export async function openInEditor(file?: string, prefer?: string): Promise<EditorResult | null> {
   try {
     const r = await fetch(url('/api/vscode'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ file }),
+      body: JSON.stringify({ file, prefer }),
       signal: AbortSignal.timeout(20000),
     })
     return (await r.json()) as EditorResult

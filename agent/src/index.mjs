@@ -266,7 +266,7 @@ const server = http.createServer(async (req, res) => {
 
       if (url.pathname === '/api/vscode' && req.method === 'POST') {
         const body = await readJson(req)
-        const r = await openEditor(WORKSPACE, body.file)
+        const r = await openEditor(WORKSPACE, body.file, body.prefer)
         return sendJson(res, r.ok ? 200 : 500, r)
       }
 
@@ -371,7 +371,7 @@ server.listen(PORT, BIND, () => {
   const editor = detectEditor()
   const line = '─'.repeat(56)
   console.log(`\n  ${line}`)
-  console.log('  HTTP DUEL · local agent')
+  console.log('  NIVIX ACADEMY · local agent')
   console.log(`  UI          http://127.0.0.1:${PORT}/`)
   console.log(`  LAN / ZT    ${net.preferred ? `ws://${net.preferred}:${PORT}` : 'no external IPv4 found'}`)
   console.log(`  ZeroTier    ${net.zerotier ? `${net.zerotier.name} · ${net.zerotier.address}` : 'not detected'}`)

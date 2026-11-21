@@ -88,12 +88,14 @@ interface AudioState {
   muted: boolean
   toggle: () => void
   setMuted: (v: boolean) => void
+  volume: number
+  setVolume: (v: number) => void
   pack: SoundPack
   setPack: (p: SoundPack) => void
 }
 
 const AudioContext = createContext<AudioState>({
-  muted: false, toggle: () => {}, setMuted: () => {}, pack: 'arwes', setPack: () => {},
+  muted: false, toggle: () => {}, setMuted: () => {}, volume: 0.45, setVolume: () => {}, pack: 'arwes', setPack: () => {},
 })
 
 export const useAudio = () => useContext(AudioContext)
@@ -101,12 +103,19 @@ export const useAudio = () => useContext(AudioContext)
 const readStoredMute = () => {
   try { return localStorage.getItem('duel.muted') === '1' } catch { return false }
 }
+const readStoredVolume = () => {
+  try {
+    const v = Number(localStorage.getItem('duel.volume'))
+    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : 0.45
+  } catch { return 0.45 }
+}
 const readStoredPack = (): SoundPack => {
   try { return localStorage.getItem('duel.pack') === 'kenney' ? 'kenney' : 'arwes' } catch { return 'arwes' }
 }
 
 export function SfxProvider({ children }: { children: ReactNode }) {
   const [muted, setMutedState] = useState(readStoredMute)
+  const [volume, setVolumeState] = useState(readStoredVolume)
   const [pack, setPackState] = useState<SoundPack>(readStoredPack)
 
   const setMuted = useCallback((v: boolean) => {
@@ -114,14 +123,19 @@ export function SfxProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem('duel.muted', v ? '1' : '0') } catch { /* ignore */ }
   }, [])
   const toggle = useCallback(() => setMuted(!muted), [muted, setMuted])
+  const setVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(1, v))
+    setVolumeState(clamped)
+    try { localStorage.setItem('duel.volume', String(clamped)) } catch { /* ignore */ }
+  }, [])
   const setPack = useCallback((p: SoundPack) => {
     setPackState(p)
     try { localStorage.setItem('duel.pack', p) } catch { /* ignore */ }
   }, [])
 
   const value = useMemo(
-    () => ({ muted, toggle, setMuted, pack, setPack }),
-    [muted, toggle, setMuted, pack, setPack],
+    () => ({ muted, toggle, setMuted, volume, setVolume, pack, setPack }),
+    [muted, toggle, setMuted, volume, setVolume, pack, setPack],
   )
 
   return (
@@ -129,7 +143,7 @@ export function SfxProvider({ children }: { children: ReactNode }) {
       {/* keyed by pack so the bleeps manager is rebuilt with the new sources */}
       <BleepsProvider
         key={pack}
-        master={{ volume: 0.45 }}
+        master={{ volume }}
         categories={{
           background: { volume: 0.25, muteOnWindowBlur: true },
           interaction: { volume: 0.9 },

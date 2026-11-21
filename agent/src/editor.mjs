@@ -51,9 +51,16 @@ export function detectEditor() {
   return c ? { name: c.name, command: c.command } : null
 }
 
-/** Open `dir` (or a file within it) in the first available editor. */
-export function openEditor(dir, file) {
-  const list = candidates()
+function orderFor(list, prefer) {
+  if (!prefer || prefer === 'auto') return list
+  const want = prefer === 'vscode' ? 'VS Code' : prefer === 'cursor' ? 'Cursor' : prefer === 'codium' ? 'VSCodium' : null
+  if (!want) return list
+  return [...list.filter(c => c.name === want), ...list.filter(c => c.name !== want)]
+}
+
+/** Open `dir` (or a file within it); `prefer` biases the editor choice. */
+export function openEditor(dir, file, prefer) {
+  const list = orderFor(candidates(), prefer)
   if (!list.length) {
     return Promise.resolve({ ok: false, error: 'No VS Code / Cursor / VSCodium installation found.' })
   }

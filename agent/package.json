@@ -1,15 +1,18 @@
 {
-  "name": "http-duel-agent",
+  "name": "nivix-academy-agent",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Local HTTP DUEL agent: serves the UI, supervises the player's server, judges rounds, relays two peers over LAN/ZeroTier.",
-  "bin": { "http-duel": "src/index.mjs" },
+  "description": "Nivix Academy local agent: serves the UI, supervises the player's server, judges rounds, relays rooms over LAN/ZeroTier.",
+  "bin": {
+    "http-duel": "src/index.mjs"
+  },
   "scripts": {
     "start": "node src/index.mjs",
     "dev": "node --watch src/index.mjs"
   },
   "dependencies": {
+    "libzt": "^0.2.0",
     "ws": "^8.18.0"
   }
 }

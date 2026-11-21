@@ -338,7 +338,7 @@ function MuteButton() {
   )
 }
 
-function Hud({ s }: { s: State }) {
+function Hud({ s, onSettings }: { s: State; onSettings: () => void }) {
   const total = ROUNDS[s.round - 1].tests.length
   return (
     <header
@@ -354,7 +354,7 @@ function Hud({ s }: { s: State }) {
       {/* left — identity + you */}
       <div className="flex items-center justify-between gap-4 min-w-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="font-orbitron font-bold text-[13px] tracking-[0.18em]" style={{ color: 'var(--color-primary)', textShadow: 'var(--text-glow-green)' }}>◈ HTTP DUEL</span>
+          <span className="font-orbitron font-bold text-[13px] tracking-[0.18em]" style={{ color: 'var(--color-primary)', textShadow: 'var(--text-glow-green)' }}>◈ NIVIX ACADEMY</span>
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
           <span className="font-orbitron text-[11px] tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>ROUND {s.round}<span style={{ color: 'var(--text-muted)' }}>/{s.totalRounds}</span></span>
         </div>
@@ -382,7 +382,7 @@ function Hud({ s }: { s: State }) {
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
           <span className="font-mono text-[13px] tracking-[0.06em]" style={{ fontVariantNumeric: 'tabular-nums', minWidth: 52, textAlign: 'right' }}>{fmt(s.elapsed)}</span>
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
-          <MuteButton />
+          <button onClick={onSettings} title="settings" className="relative cursor-pointer bg-transparent border-0 text-[13px] leading-none" style={{ color: 'var(--text-secondary)' }}>⚙</button>
         </div>
       </div>
     </header>
@@ -493,7 +493,7 @@ function LobbyBackdrop() {
   )
 }
 
-function Lobby({ s, send, agent }: { s: State; send: Send; agent: AgentStatus | null }) {
+function Lobby({ s, send, agent, onSettings }: { s: State; send: Send; agent: AgentStatus | null; onSettings: () => void }) {
   const seg = (l: 'python' | 'csharp', label: string, i: number) => {
     const active = s.me.lang === l
     return (
@@ -521,9 +521,12 @@ function Lobby({ s, send, agent }: { s: State; send: Send; agent: AgentStatus | 
       <LobbyBackdrop />
       <div className="relative z-10 flex-1 overflow-auto flex justify-center">
         <div className="w-[min(820px,92vw)] flex flex-col gap-5 py-8">
+          <div className="flex justify-end -mb-2">
+            <button onClick={onSettings} className="micro">⚙ SETTINGS</button>
+          </div>
           <div className="text-center">
-            <div className="font-orbitron font-bold text-[26px] tracking-[0.22em] text-primary" style={{ textShadow: '0 0 34px color-mix(in oklab, var(--color-primary) 40%, transparent)' }}>HTTP DUEL</div>
-            <div className="font-mono text-[9px] tracking-[0.3em] mt-1.5" style={{ color: 'var(--text-muted)' }}>PROTOCOL COMBAT · PYTHON VS C#</div>
+            <div className="font-orbitron font-bold text-[26px] tracking-[0.22em] text-primary" style={{ textShadow: '0 0 34px color-mix(in oklab, var(--color-primary) 40%, transparent)' }}>NIVIX ACADEMY</div>
+            <div className="font-mono text-[9px] tracking-[0.3em] mt-1.5" style={{ color: 'var(--text-muted)' }}>HTTP DUEL · PYTHON VS C#</div>
           </div>
 
           <div className="flex items-center justify-center gap-2 font-mono text-[9px] tracking-[0.14em]">
@@ -763,7 +766,9 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
 function Workspace({ s, send }: { s: State; send: Send }) {
   const openWorkspace = async () => {
     const file = s.me.lang === 'python' ? 'python/server.py' : 'csharp/Program.cs'
-    const r = await openInEditor(file)
+    let prefer = 'auto'
+    try { prefer = localStorage.getItem('duel.editor') || 'auto' } catch { /* ignore */ }
+    const r = await openInEditor(file, prefer)
     if (r === null) send({ type: 'VSCODE' })
     else if (r.ok) send({ type: 'SYS_NOTE', value: `OPENED IN ${(r.editor || 'EDITOR').toUpperCase()}` })
     else send({ type: 'SYS_NOTE', value: `EDITOR: ${r.error || 'could not open'}` })
@@ -841,10 +846,10 @@ function Tester({ s, send }: { s: State; send: Send }) {
   )
 }
 
-function Match({ s, send }: { s: State; send: Send }) {
+function Match({ s, send, onSettings }: { s: State; send: Send; onSettings: () => void }) {
   return (
     <>
-      <Hud s={s} />
+      <Hud s={s} onSettings={onSettings} />
       <div className="flex-1 grid min-h-0 gap-2 p-2" style={{ gridTemplateColumns: '44% 1fr' }}>
         <section className="grid min-h-0 gap-2" style={{ gridTemplateRows: '1fr 260px' }}>
           <Brief key={`b${s.round}`} s={s} send={send} />
@@ -896,7 +901,7 @@ function Final({ s, send }: { s: State; send: Send }) {
   return (
     <>
       <header className="flex items-center gap-3 px-4 py-2" style={{ borderBottom: '1px solid var(--border)', background: 'color-mix(in oklab, var(--surface-raised) 60%, transparent)' }}>
-        <span className="font-orbitron font-bold tracking-[0.14em] text-primary text-[12px]">◈ HTTP DUEL</span>
+        <span className="font-orbitron font-bold tracking-[0.14em] text-primary text-[12px]">◈ NIVIX ACADEMY</span>
         <span style={{ color: 'var(--border)' }}>|</span>
         <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>MATCH COMPLETE</span>
         <span className="flex-1" />
@@ -988,6 +993,74 @@ function Backdrop() {
   )
 }
 
+/* ── settings ──────────────────────────────────────── */
+
+function Settings({ onClose }: { onClose: () => void }) {
+  const { muted, setMuted, volume, setVolume } = useAudio()
+  const [editor, setEditor] = useState(() => {
+    try { return localStorage.getItem('duel.editor') || 'auto' } catch { return 'auto' }
+  })
+  const chooseEditor = (v: string) => {
+    setEditor(v)
+    try { localStorage.setItem('duel.editor', v) } catch { /* ignore */ }
+  }
+
+  const EditorOption = ({ id, label, sub }: { id: string; label: string; sub?: string }) => {
+    const active = editor === id
+    return (
+      <button
+        onClick={() => chooseEditor(id)}
+        className="text-left px-3 py-2 cursor-pointer"
+        style={{
+          border: '1px solid ' + (active ? 'var(--color-primary)' : 'var(--border)'),
+          background: active ? 'color-mix(in oklab, var(--color-primary) 10%, transparent)' : 'transparent',
+          color: active ? 'var(--color-primary)' : 'var(--text-secondary)',
+        }}
+      >
+        <div className="font-mono text-[10px] tracking-[0.12em]">{label}</div>
+        {sub && <div className="font-mono text-[8px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{sub}</div>}
+      </button>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center overlay-in" style={{ background: 'rgba(4,7,12,0.78)' }} onClick={onClose}>
+      <Panel notch="md" className="cosmic-panel w-[min(540px,92vw)] flex flex-col" onClick={e => e.stopPropagation()}>
+        <PanelHead title="SETTINGS" right={<button onClick={onClose} className="micro">CLOSE</button>} />
+        <div className="p-5 flex flex-col gap-6">
+          <section className="flex flex-col gap-2">
+            <div className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>OPEN CODE IN</div>
+            <div className="grid grid-cols-4 gap-2">
+              <EditorOption id="auto" label="AUTO" sub="VS Code → Cursor" />
+              <EditorOption id="vscode" label="VS CODE" />
+              <EditorOption id="cursor" label="CURSOR" />
+              <EditorOption id="codium" label="VSCODIUM" />
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>AUDIO</span>
+              <button onClick={() => setMuted(!muted)} className="micro" style={{ color: muted ? 'var(--text-muted)' : 'var(--color-primary)' }}>{muted ? 'MUTED' : 'ON'}</button>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>VOL</span>
+              <input
+                type="range" min={0} max={100} value={Math.round(volume * 100)}
+                onChange={e => setVolume(Number(e.target.value) / 100)}
+                className="flex-1" style={{ accentColor: 'var(--color-primary)' }} disabled={muted}
+              />
+              <span className="font-mono text-[10px] w-8 text-right" style={{ color: 'var(--text-secondary)' }}>{Math.round(volume * 100)}</span>
+            </div>
+          </section>
+
+          <p className="font-mono text-[8px] leading-4" style={{ color: 'var(--text-muted)' }}>Stored locally in your browser. The editor preference is sent to the local agent when you press OPEN IN VS CODE.</p>
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
 /* ── screen transition fade ────────────────────────── */
 
 function ScreenFade({ screen }: { screen: string }) {
@@ -1000,6 +1073,7 @@ export default function App() {
   const [s, send] = useDuel()
   const sfx = useSfx()
   const agent = useAgent()
+  const [settingsOpen, setSettingsOpen] = useState(false)
   useSoundReactions(s, sfx)
   useGlobalSfx(sfx)
 
@@ -1020,18 +1094,19 @@ export default function App() {
 
         <div className="relative z-10 flex-1 min-h-0 flex flex-col">
           {s.screen === 'boot' && <Boot s={s} send={send} />}
-          {s.screen === 'lobby' && <Lobby s={s} send={send} agent={agent} />}
-          {s.screen === 'match' && <Match s={s} send={send} />}
+          {s.screen === 'lobby' && <Lobby s={s} send={send} agent={agent} onSettings={() => setSettingsOpen(true)} />}
+          {s.screen === 'match' && <Match s={s} send={send} onSettings={() => setSettingsOpen(true)} />}
           {s.screen === 'matchResult' && <Final s={s} send={send} />}
           {s.screen === 'countdown' && <Countdown s={s} />}
           {s.screen === 'roundResult' && <RoundResult s={s} send={send} />}
 
           <div className="flex-none h-[24px] flex items-center px-3 font-mono text-[9px] tracking-[0.08em]" style={{ color: 'var(--color-amber)', borderTop: '1px dashed color-mix(in oklab, var(--color-amber) 30%, transparent)', background: 'rgba(20,14,4,0.5)' }}>
-            PROTOTYPE · UI: Cosmic UI + scificn/ui + Arwes NEXT · fake data, no backend · MOCK CONTROLS ↑
+            NIVIX ACADEMY · local agent · fake data, no cloud · MOCK CONTROLS ↑
           </div>
         </div>
 
         <ScreenFade screen={s.screen} />
+        {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
         <MockControls s={s} send={send} />
       </div>
     </Animator>
