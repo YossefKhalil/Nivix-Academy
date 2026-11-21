@@ -238,6 +238,7 @@ export function reduce(s0: State, a: Action): State {
       if (s.energy < COST_AI) { s.wiki.push({ q: a.value as string, a: 'Not enough energy — ' + s.energy + ' left, ' + COST_AI + ' needed.' }); break }
       s.energy -= COST_AI; s.wiki.push({ q: a.value as string, a: aiAnswer(a.value as string) }); break
     case 'VSCODE': sys(s.chat, 'WORKSPACE OPENED IN VS CODE'); break
+    case 'SYS_NOTE': sys(s.chat, a.value as string); break
     case 'RUN_TESTS': runTests(s); break
     case 'SUBMIT': submit(s); break
     case 'NEXT': if (s.round < s.totalRounds) { s.round++; s.screen = 'countdown'; s.countdown = 3 } else { s.screen = 'matchResult' } break

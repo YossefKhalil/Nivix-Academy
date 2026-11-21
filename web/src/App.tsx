@@ -11,6 +11,7 @@ import { Animator, Dots, Text, useBleeps } from '@arwes/react'
 import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
+import { getAgentStatus, openInEditor, type AgentStatus } from './agent'
 
 type Send = (a: Action) => void
 const borderA = (c: string) => `color-mix(in oklab, ${c} 50%, transparent)`
@@ -297,6 +298,23 @@ function useGlobalSfx(sfx: Sfx) {
   }, [sfx])
 }
 
+/* ── agent presence ────────────────────────────────── */
+
+function useAgent() {
+  const [status, setStatus] = useState<AgentStatus | null>(null)
+  useEffect(() => {
+    let alive = true
+    const probe = async () => {
+      const st = await getAgentStatus()
+      if (alive) setStatus(st)
+    }
+    probe()
+    const id = window.setInterval(probe, 15000)
+    return () => { alive = false; window.clearInterval(id) }
+  }, [])
+  return status
+}
+
 /* ── HUD ───────────────────────────────────────────── */
 
 function MuteButton() {
@@ -475,7 +493,7 @@ function LobbyBackdrop() {
   )
 }
 
-function Lobby({ s, send }: { s: State; send: Send }) {
+function Lobby({ s, send, agent }: { s: State; send: Send; agent: AgentStatus | null }) {
   const seg = (l: 'python' | 'csharp', label: string, i: number) => {
     const active = s.me.lang === l
     return (
@@ -506,6 +524,24 @@ function Lobby({ s, send }: { s: State; send: Send }) {
           <div className="text-center">
             <div className="font-orbitron font-bold text-[26px] tracking-[0.22em] text-primary" style={{ textShadow: '0 0 34px color-mix(in oklab, var(--color-primary) 40%, transparent)' }}>HTTP DUEL</div>
             <div className="font-mono text-[9px] tracking-[0.3em] mt-1.5" style={{ color: 'var(--text-muted)' }}>PROTOCOL COMBAT · PYTHON VS C#</div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 font-mono text-[9px] tracking-[0.14em]">
+            {agent ? (
+              <>
+                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)', boxShadow: 'var(--glow-green)' }} />
+                <span style={{ color: 'var(--color-green)' }}>AGENT ONLINE</span>
+                {agent.zerotier
+                  ? <span style={{ color: 'var(--text-muted)' }}>· ZT {agent.zerotier.address}</span>
+                  : agent.lan ? <span style={{ color: 'var(--text-muted)' }}>· LAN {agent.lan.address}</span> : null}
+                {agent.editor ? <span style={{ color: 'var(--text-muted)' }}>· {agent.editor.name.toUpperCase()}</span> : null}
+              </>
+            ) : (
+              <>
+                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: 'var(--text-muted)' }} />
+                <span style={{ color: 'var(--text-muted)' }}>MOCK MODE · no agent</span>
+              </>
+            )}
           </div>
 
           <GameCard bodyClassName="flex gap-6 items-end p-5">
@@ -725,11 +761,18 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
 /* ── match: workspace ──────────────────────────────── */
 
 function Workspace({ s, send }: { s: State; send: Send }) {
+  const openWorkspace = async () => {
+    const file = s.me.lang === 'python' ? 'python/server.py' : 'csharp/Program.cs'
+    const r = await openInEditor(file)
+    if (r === null) send({ type: 'VSCODE' })
+    else if (r.ok) send({ type: 'SYS_NOTE', value: `OPENED IN ${(r.editor || 'EDITOR').toUpperCase()}` })
+    else send({ type: 'SYS_NOTE', value: `EDITOR: ${r.error || 'could not open'}` })
+  }
   return (
     <div className="cosmic-panel flex flex-col min-h-0 anim-in">
       <PanelHead
         title="WORKSPACE"
-        right={<button onClick={() => send({ type: 'VSCODE' })} className="micro vscode inline-flex items-center gap-1.5"><VscodeIcon size={12} />OPEN IN VS CODE</button>}
+        right={<button onClick={openWorkspace} className="micro vscode inline-flex items-center gap-1.5"><VscodeIcon size={12} />OPEN IN VS CODE</button>}
       />
 
       <textarea
@@ -956,6 +999,7 @@ function ScreenFade({ screen }: { screen: string }) {
 export default function App() {
   const [s, send] = useDuel()
   const sfx = useSfx()
+  const agent = useAgent()
   useSoundReactions(s, sfx)
   useGlobalSfx(sfx)
 
@@ -976,7 +1020,7 @@ export default function App() {
 
         <div className="relative z-10 flex-1 min-h-0 flex flex-col">
           {s.screen === 'boot' && <Boot s={s} send={send} />}
-          {s.screen === 'lobby' && <Lobby s={s} send={send} />}
+          {s.screen === 'lobby' && <Lobby s={s} send={send} agent={agent} />}
           {s.screen === 'match' && <Match s={s} send={send} />}
           {s.screen === 'matchResult' && <Final s={s} send={send} />}
           {s.screen === 'countdown' && <Countdown s={s} />}
