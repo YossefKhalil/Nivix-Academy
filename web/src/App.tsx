@@ -335,20 +335,36 @@ function MuteButton() {
 type ScoreRow = { id: string; name: string; lang: 'python' | 'csharp'; score?: number | null; host?: boolean; connected?: boolean; me?: boolean }
 
 function ScoreCard({ row, you, total }: { row: ScoreRow; you?: boolean; total: number }) {
-  const pct = Math.max(0, Math.min(1, (row.score ?? 0) / Math.max(1, total)))
+  const stage = row.score == null ? 0 : Math.max(0, Math.min(4, Math.ceil((row.score / Math.max(1, total)) * 4)))
   const tone = you ? 'var(--color-primary)' : 'var(--color-accent)'
   return (
-    <span className="flex flex-col justify-center gap-1 px-2.5 py-1 border min-w-[118px] max-w-[190px]" style={{ borderColor: you ? 'color-mix(in oklab, var(--color-primary) 45%, transparent)' : 'var(--border)', background: 'color-mix(in oklab, var(--surface-raised) 70%, transparent)' }}>
-      <span className="flex items-center gap-2 min-w-0">
-        <span className="font-orbitron text-[11px] tracking-[0.08em] truncate" style={{ color: you ? 'var(--color-primary)' : 'var(--text-secondary)' }}>{row.name}</span>
-        <LangIcon lang={row.lang} size={12} />
-        <span className="flex-1" />
-        <span className="font-mono text-[10px]" style={{ color: tone }}>{row.score ?? '—'}<span style={{ color: 'var(--text-muted)' }}>/{total}</span></span>
-        {row.connected === false && <span className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>OFF</span>}
+    <span
+      className="relative flex items-center gap-2.5 px-3 h-[34px] min-w-[160px] max-w-[230px]"
+      style={{
+        background: 'linear-gradient(180deg, color-mix(in oklab, var(--surface-raised) 92%, black), var(--surface))',
+        boxShadow: `inset 0 0 0 1px ${you ? 'color-mix(in oklab, var(--color-primary) 48%, transparent)' : 'var(--border)'}, ${you ? '0 0 14px color-mix(in oklab, var(--color-primary) 14%, transparent)' : 'none'}`,
+        clipPath: you
+          ? 'polygon(0 0, 100% 0, 100% 100%, 11px 100%, 0 calc(100% - 11px))'
+          : 'polygon(0 0, 100% 0, calc(100% - 11px) 100%, 0 100%)',
+      }}
+    >
+      <span className="font-orbitron text-[12px] tracking-[0.08em] truncate" style={{ color: you ? 'var(--color-primary)' : 'var(--text-secondary)' }}>{row.name}</span>
+      <LangIcon lang={row.lang} size={12} />
+      <span className="flex items-center gap-[3px] ml-auto" title={`stage ${stage}/4`}>
+        {[1, 2, 3, 4].map(i => (
+          <i
+            key={i}
+            style={{
+              display: 'block', width: 7, height: 13,
+              background: i <= stage ? tone : 'color-mix(in oklab, var(--border) 85%, transparent)',
+              clipPath: 'polygon(36% 0, 100% 0, 64% 100%, 0 100%)',
+              boxShadow: i <= stage ? `0 0 9px ${tone}` : undefined,
+              transition: 'background 0.3s ease, box-shadow 0.3s ease',
+            }}
+          />
+        ))}
       </span>
-      <span className="relative block h-[3px] overflow-hidden" style={{ background: 'color-mix(in oklab, var(--border) 80%, transparent)' }}>
-        <i className="absolute inset-y-0 left-0 block transition-all duration-500" style={{ width: `${pct * 100}%`, background: tone, boxShadow: `0 0 8px ${tone}` }} />
-      </span>
+      <span className="font-mono text-[12px]" style={{ color: tone, fontVariantNumeric: 'tabular-nums' }}>{row.score ?? '—'}<span style={{ color: 'var(--text-muted)' }}>/{total}</span></span>
     </span>
   )
 }
@@ -819,7 +835,7 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
                   f.style.setProperty('left', '0', 'important')
                   f.style.setProperty('width', '100%', 'important')
                   f.style.setProperty('height', '100%', 'important')
-                  f.style.setProperty('transform', 'scale(1.55)', 'important')
+                  f.style.setProperty('transform', 'none', 'important')
                   f.style.setProperty('transform-origin', 'center center', 'important')
                   f.style.setProperty('pointer-events', 'none', 'important')
                 }
@@ -1221,14 +1237,7 @@ function Workspace({ s, send }: { s: State; send: Send }) {
         }
       />
 
-      <textarea
-        value={code ?? ''}
-        onChange={e => { setCode(e.target.value); setSaved(null) }}
-        onBlur={save}
-        spellCheck={false}
-        className="flex-1 min-h-0 w-full resize-none outline-none px-4 py-3 font-mono text-[13px] leading-[1.65]"
-        style={{ background: 'var(--background)', color: 'var(--text-secondary)', border: 0 }}
-      />
+      <CodeEditor value={code ?? ''} onChange={v => { setCode(v); setSaved(null) }} onBlur={save} lang={s.me.lang} />
     </div>
   )
 }
