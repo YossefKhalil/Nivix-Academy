@@ -26,6 +26,7 @@ import { libztAvailable } from './transport.mjs'
 import { ztApi } from './zerotier-api.mjs'
 import { createConfig } from './config.mjs'
 import { startAnnouncer, discover } from './discovery.mjs'
+import { RelayClient } from './relay-client.mjs'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const AGENT_ROOT = resolvePath(here, '..')
@@ -111,6 +112,11 @@ libztAvailable().then(v => { libztReady = v })
 
 const config = createConfig(AGENT_ROOT)
 
+const relay = new RelayClient({
+  onMessage: msg => room.broadcastLocal({ t: 'relay', payload: msg }),
+  onStatus: () => room.broadcastLocal({ t: 'relay-status', status: relay.status }),
+})
+
 const room = new Room({
   stateDir: join(AGENT_ROOT, '.zt'),
   onLog: line => {
@@ -166,6 +172,7 @@ function status() {
     editor: detectEditor(),
     server: runner.status,
     libzt: libztReady,
+    relay: relay.status,
     room: room.snapshot(),
   }
 }
@@ -367,6 +374,43 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      if (url.pathname === '/api/relay' && req.method === 'GET') {
+        return sendJson(res, 200, { ok: true, relay: relay.status })
+      }
+
+      if (url.pathname === '/api/relay/room' && req.method === 'POST') {
+        const body = await readJson(req)
+        try {
+          const r = await relay.create({
+            relayUrl: body.relayUrl || 'http://127.0.0.1:8090',
+            maxPlayers: body.maxPlayers,
+            totalRounds: body.totalRounds,
+            name: body.name,
+            lang: body.lang,
+          })
+          return sendJson(res, 200, { ok: true, code: r.code, room: relay.room, relay: relay.status })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
+      }
+
+      if (url.pathname === '/api/relay/join' && req.method === 'POST') {
+        const body = await readJson(req)
+        const code = String(body.code || '').toUpperCase()
+        if (!code) return sendJson(res, 400, { ok: false, error: 'code required' })
+        try {
+          await relay.join({ relayUrl: body.relayUrl || 'http://127.0.0.1:8090', code, name: body.name, lang: body.lang })
+          return sendJson(res, 200, { ok: true, code, room: relay.room, relay: relay.status })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
+      }
+
+      if (url.pathname === '/api/relay/leave' && req.method === 'POST') {
+        relay.leave()
+        return sendJson(res, 200, { ok: true })
+      }
+
       if (url.pathname === '/api/code' && req.method === 'GET') {
         const lang = url.searchParams.get('lang') === 'csharp' ? 'csharp' : 'python'
         const file = lang === 'csharp' ? join(WORKSPACE, 'csharp', 'Program.cs') : join(WORKSPACE, 'python', 'server.py')
@@ -398,7 +442,14 @@ const server = http.createServer(async (req, res) => {
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, 'http://local')
   if (url.pathname !== '/ws/local') { socket.destroy(); return }
-  wss.handleUpgrade(req, socket, head, ws => room.joinLocal(ws))
+  wss.handleUpgrade(req, socket, head, ws => {
+    ws.on('message', data => {
+      let m
+      try { m = JSON.parse(data.toString()) } catch { return }
+      if (m?.t === 'relay-send') relay.send(m.msg)
+    })
+    room.joinLocal(ws)
+  })
 })
 
 server.listen(PORT, BIND, () => {
@@ -427,6 +478,7 @@ server.listen(PORT, BIND, () => {
 })
 
 const shutdown = async () => {
+  try { relay.leave() } catch { /* ignore */ }
   try { await room.teardown() } catch { /* ignore */ }
   try { await runner.stop() } catch { /* ignore */ }
   process.exit(0)
