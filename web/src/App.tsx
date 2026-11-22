@@ -11,7 +11,7 @@ import { Animator, Dots, Text, useBleeps } from '@arwes/react'
 import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
-import { getAgentStatus, openInEditor, type AgentStatus } from './agent'
+import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, type AgentStatus } from './agent'
 import { useLiveRoom, createRoom, joinRoom, leaveRoom, getZt, setZtToken, createZtNetwork, type RoomMember } from './room'
 
 type Send = (a: Action) => void
@@ -235,14 +235,7 @@ function useDuel(): [State, Send] {
   const ref = useRef(s)
   ref.current = s
 
-  const send = useCallback((a: Action) => {
-    dispatch(a)
-    if (a.type === 'CREATE_ROOM' || a.type === 'JOIN_ROOM') {
-      setTimeout(() => dispatch({ type: 'OPP_JOIN' }), 1200)
-      setTimeout(() => dispatch({ type: 'OPP_READY' }), 2600)
-    }
-    if (a.type === 'SEND_CHAT') setTimeout(() => dispatch({ type: 'OPP_CHAT' }), 1200 + Math.random() * 1200)
-  }, [])
+  const send = useCallback((a: Action) => { dispatch(a) }, [])
 
   useEffect(() => {
     let acc = { boot: 0, count: 0, tick: 0 }
@@ -913,6 +906,23 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
 /* ── match: workspace ──────────────────────────────── */
 
 function Workspace({ s, send }: { s: State; send: Send }) {
+  const [code, setCode] = useState<string | null>(null)
+  const [saved, setSaved] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    getCode(s.me.lang).then(c => {
+      if (alive) setCode(c ?? (s.me.lang === 'python' ? PY_CODE : CS_CODE))
+    })
+    return () => { alive = false }
+  }, [s.me.lang])
+
+  const save = async () => {
+    if (code == null) return
+    const ok = await saveCode(s.me.lang, code)
+    setSaved(ok)
+  }
+
   const openWorkspace = async () => {
     const file = s.me.lang === 'python' ? 'python/server.py' : 'csharp/Program.cs'
     let prefer = 'auto'
@@ -922,16 +932,25 @@ function Workspace({ s, send }: { s: State; send: Send }) {
     else if (r.ok) send({ type: 'SYS_NOTE', value: `OPENED IN ${(r.editor || 'EDITOR').toUpperCase()}` })
     else send({ type: 'SYS_NOTE', value: `EDITOR: ${r.error || 'could not open'}` })
   }
+
   return (
     <div className="cosmic-panel flex flex-col min-h-0 anim-in">
       <PanelHead
         title="WORKSPACE"
-        right={<button onClick={openWorkspace} className="micro vscode inline-flex items-center gap-1.5"><VscodeIcon size={12} />OPEN IN VS CODE</button>}
+        right={
+          <span className="flex items-center gap-2">
+            <span className="font-mono text-[8px] tracking-[0.12em]" style={{ color: saved === false ? 'var(--color-amber)' : 'var(--text-muted)' }}>
+              {saved === null ? 'LOCAL FILE' : saved ? 'SAVED' : 'SAVE FAILED'}
+            </span>
+            <button onClick={openWorkspace} className="micro vscode inline-flex items-center gap-1.5"><VscodeIcon size={12} />OPEN IN VS CODE</button>
+          </span>
+        }
       />
 
       <textarea
-        key={s.me.lang}
-        defaultValue={s.me.lang === 'python' ? PY_CODE : CS_CODE}
+        value={code ?? ''}
+        onChange={e => { setCode(e.target.value); setSaved(null) }}
+        onBlur={save}
         spellCheck={false}
         className="flex-1 min-h-0 w-full resize-none outline-none px-4 py-3 font-mono text-[13px] leading-[1.65]"
         style={{ background: 'var(--background)', color: 'var(--text-secondary)', border: 0 }}
@@ -944,12 +963,23 @@ function Workspace({ s, send }: { s: State; send: Send }) {
 
 function Tester({ s, send }: { s: State; send: Send }) {
   const R = ROUNDS[s.round - 1]
-  const revealed = s.ranTests || s.final
-  const shown = revealed ? R.tests.filter(t => t.visible || s.final) : []
+  const results = s.testResults
+  const shown = results ?? (s.ranTests ? R.tests.filter(t => t.visible || s.final) : [])
   const passed = shown.filter(t => t.pass).length
   const failed = shown.length - passed
   const score = s.me.score != null ? `${s.me.score}/${R.tests.length}` : '—'
-  const revealedSet = new Set(shown)
+
+  const runTests = async () => {
+    const r = await judgeRound(s.round, s.me.lang)
+    if (r?.results) send({ type: 'TESTS_RESULT', results: r.results })
+    else send({ type: 'RUN_TESTS' })
+  }
+  const submit = async () => {
+    if (s.me.submitted) return
+    const r = await judgeRound(s.round, s.me.lang)
+    if (r?.results) send({ type: 'TESTS_RESULT', results: r.results })
+    send({ type: 'SUBMIT' })
+  }
 
   return (
     <div className="cosmic-panel flex flex-col min-h-0 anim-in">
@@ -960,8 +990,9 @@ function Tester({ s, send }: { s: State; send: Send }) {
             <span className="font-orbitron text-[15px] leading-none" style={{ color: 'var(--text-secondary)' }}>{score}</span>
             <span className="flex items-end gap-[3px] h-[14px]" title="per-test status">
               {R.tests.map((t, i) => {
-                const on = revealedSet.has(t)
-                const c = !on ? 'var(--border)' : t.pass ? 'var(--color-green)' : 'var(--color-red)'
+                const r = results?.[i]
+                const on = !!r
+                const c = !on ? 'var(--border)' : r.pass ? 'var(--color-green)' : 'var(--color-red)'
                 return <i key={i} className="block w-[5px] h-[14px]" style={{ background: c, opacity: on ? 1 : 0.5, boxShadow: on ? `0 0 6px ${c}` : undefined }} />
               })}
             </span>
@@ -971,9 +1002,9 @@ function Tester({ s, send }: { s: State; send: Send }) {
         }
         right={
           <span className="microgroup">
-            <button onClick={() => send({ type: 'RUN_TESTS' })} className="micro"><span className="mr-1 opacity-80">▶</span>RUN</button>
+            <button onClick={runTests} className="micro"><span className="mr-1 opacity-80">▶</span>RUN</button>
             <span style={{ width: 1, background: 'color-mix(in oklab, var(--color-primary) 25%, transparent)' }} />
-            <button onClick={() => send({ type: 'SUBMIT' })} disabled={s.me.submitted} className="micro primary">SUBMIT</button>
+            <button onClick={submit} disabled={s.me.submitted} className="micro primary">SUBMIT</button>
           </span>
         }
       />
@@ -981,7 +1012,7 @@ function Tester({ s, send }: { s: State; send: Send }) {
       <div className="flex-1 overflow-auto px-2 py-1 flex flex-col gap-1">
         {!shown.length && (
           <div className="flex items-center justify-center py-2">
-            <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>RUN TESTS to probe the visible suite</span>
+            <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>RUN to judge your server against the suite</span>
           </div>
         )}
         {shown.map((t, i) => (
@@ -1250,13 +1281,12 @@ export default function App() {
           {s.screen === 'roundResult' && <RoundResult s={s} send={send} />}
 
           <div className="flex-none h-[24px] flex items-center px-3 font-mono text-[9px] tracking-[0.08em]" style={{ color: 'var(--color-amber)', borderTop: '1px dashed color-mix(in oklab, var(--color-amber) 30%, transparent)', background: 'rgba(20,14,4,0.5)' }}>
-            NIVIX ACADEMY · local agent · fake data, no cloud · MOCK CONTROLS ↑
+            NIVIX ACADEMY · LOCAL AGENT
           </div>
         </div>
 
         <ScreenFade screen={s.screen} />
         {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
-        <MockControls s={s} send={send} />
       </div>
     </Animator>
   )

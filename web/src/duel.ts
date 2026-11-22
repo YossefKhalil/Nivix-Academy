@@ -132,11 +132,12 @@ export interface State {
   hintsOpen: boolean; energy: number; hintsPaid: boolean
   chat: Msg[]; wiki: WikiEntry[]
   ranTests: boolean; final: boolean; oppTick: number
+  testResults: { name: string; pass: boolean }[] | null
   rounds: RoundScore[]
   countdown: number; mockOpen: boolean
 }
 
-export type Action = { type: string; value?: string }
+export type Action = { type: string; value?: string; results?: { name: string; pass: boolean }[] }
 
 export function initial(): State {
   return {
@@ -149,7 +150,7 @@ export function initial(): State {
     leftTab: 'comms',
     hintsOpen: false, energy: ENERGY_MAX, hintsPaid: false,
     chat: [], wiki: [],
-    ranTests: false, final: false, oppTick: 0,
+    ranTests: false, final: false, oppTick: 0, testResults: null,
     rounds: [], countdown: 3, mockOpen: true,
   }
 }
@@ -159,12 +160,12 @@ export const fmt = (t: number) => String(Math.floor(t / 60)).padStart(2, '0') + 
 function sys(chat: Msg[], text: string) { chat.push({ sys: true, text }) }
 
 function startRound(s: State) {
-  s.screen = 'match'; s.elapsed = 0; s.ranTests = false; s.final = false; s.hintsOpen = false; s.hintsPaid = false
+  s.screen = 'match'; s.elapsed = 0; s.ranTests = false; s.final = false; s.hintsOpen = false; s.hintsPaid = false; s.testResults = null
   s.me.submitted = false; s.me.score = null; s.me.stage = 0
   s.opp.submitted = false; s.opp.score = null; s.opp.stage = 0; s.oppTick = 0
   s.chat = []; sys(s.chat, 'ROUND ' + s.round + ' STARTED - ' + ROUNDS[s.round - 1].tag)
 }
-const mePass = (s: State) => ROUNDS[s.round - 1].tests.filter(t => t.pass).length
+const mePass = (s: State) => s.testResults ? s.testResults.filter(t => t.pass).length : ROUNDS[s.round - 1].tests.filter(t => t.pass).length
 const oppPass = (s: State) => {
   const tot = ROUNDS[s.round - 1].tests.length
   const sc = [0, 0.4, 0.65, 0.85, 1][s.opp.stage] || 0
@@ -179,7 +180,12 @@ function submit(s: State) {
   if (s.me.submitted) return
   s.me.submitted = true; s.me.stage = 4; s.final = true; s.ranTests = true; s.me.score = mePass(s)
   sys(s.chat, 'YOU SUBMITTED')
-  maybeResolve(s)
+  if (!s.opp.joined) {
+    s.rounds.push({ round: s.round, me: s.me.score as number, opp: 0 })
+    s.screen = 'roundResult'
+  } else {
+    maybeResolve(s)
+  }
 }
 function maybeResolve(s: State) {
   if (s.screen === 'match' && s.me.submitted && s.opp.submitted) {
@@ -241,6 +247,13 @@ export function reduce(s0: State, a: Action): State {
     case 'VSCODE': sys(s.chat, 'WORKSPACE OPENED IN VS CODE'); break
     case 'SYS_NOTE': sys(s.chat, a.value as string); break
     case 'RUN_TESTS': runTests(s); break
+    case 'TESTS_RESULT': {
+      s.ranTests = true
+      s.testResults = a.results || []
+      s.me.score = s.testResults.filter(t => t.pass).length
+      s.me.stage = Math.max(1, Math.min(3, 1 + Math.floor((3 * s.me.score) / Math.max(1, s.testResults.length))))
+      break
+    }
     case 'SUBMIT': submit(s); break
     case 'NEXT': if (s.round < s.totalRounds) { s.round++; s.screen = 'countdown'; s.countdown = 3 } else { s.screen = 'matchResult' } break
     case 'SEND_CHAT': s.chat.push({ who: s.me.name || 'YOU', text: a.value as string, me: true }); break

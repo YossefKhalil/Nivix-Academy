@@ -63,3 +63,23 @@ export async function judgeRound(round: number, lang: 'python' | 'csharp') {
     return null
   }
 }
+
+export async function getCode(lang: 'python' | 'csharp'): Promise<string | null> {
+  try {
+    const r = await fetch(url(`/api/code?lang=${lang}`))
+    if (!r.ok) return null
+    const j = await r.json()
+    return typeof j?.content === 'string' ? j.content : null
+  } catch { return null }
+}
+
+export async function saveCode(lang: 'python' | 'csharp', content: string): Promise<boolean> {
+  try {
+    const r = await fetch(url('/api/code'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lang, content }),
+    })
+    return r.ok
+  } catch { return false }
+}

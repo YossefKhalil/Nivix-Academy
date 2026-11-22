@@ -11,7 +11,7 @@
  * Usage: node src/index.mjs [--port 7788] [--workspace DIR] [--ui DIR] [--open]
  */
 import http from 'node:http'
-import { createReadStream, existsSync, statSync, mkdirSync, writeFileSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, statSync, mkdirSync, writeFileSync } from 'node:fs'
 import { extname, join, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
@@ -364,6 +364,20 @@ const server = http.createServer(async (req, res) => {
         } catch (e) {
           return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
         }
+      }
+
+      if (url.pathname === '/api/code' && req.method === 'GET') {
+        const lang = url.searchParams.get('lang') === 'csharp' ? 'csharp' : 'python'
+        const file = lang === 'csharp' ? join(WORKSPACE, 'csharp', 'Program.cs') : join(WORKSPACE, 'python', 'server.py')
+        return sendJson(res, 200, { ok: true, lang, content: existsSync(file) ? readFileSync(file, 'utf8') : '' })
+      }
+
+      if (url.pathname === '/api/code' && req.method === 'POST') {
+        const body = await readJson(req)
+        const lang = body.lang === 'csharp' ? 'csharp' : 'python'
+        const file = lang === 'csharp' ? join(WORKSPACE, 'csharp', 'Program.cs') : join(WORKSPACE, 'python', 'server.py')
+        writeFileSync(file, String(body.content ?? ''))
+        return sendJson(res, 200, { ok: true, lang })
       }
 
       return sendJson(res, 404, { ok: false, error: 'unknown endpoint' })

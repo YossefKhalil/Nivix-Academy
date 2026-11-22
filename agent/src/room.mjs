@@ -109,7 +109,7 @@ export class Room {
     this.outgoing = conn
     const pipe = jsonLineSocket(conn.socket, msg => this.onPeerMessage('out', msg))
     this.peers.set('out', { pipe, memberId: null, via: conn.kind })
-    pipe.send({ t: 'join', code: this.code, member: { name: member?.name, lang: member?.lang } })
+    pipe.send({ t: 'hello', code: this.code })
 
     // Mirror the host's room into our own members map for local display.
     return { ok: true, transport: conn.kind, room: this.snapshot() }
@@ -140,7 +140,7 @@ export class Room {
 
     if (msg.t === 'join') {
       if (this.role === 'host' && msg.code && String(msg.code).toUpperCase() !== this.code) { p.pipe.close(); return }
-      const m = this.upsertMember({ name: msg.member?.name, lang: msg.member?.lang, host: false, via: p.via })
+      const m = this.upsertMember({ id: msg.member?.id, name: msg.member?.name, lang: msg.member?.lang, host: false, via: p.via })
       p.memberId = m.id
       this.broadcastRoom()
       return
@@ -186,7 +186,7 @@ export class Room {
 
         if (this.role === 'guest') {
           // forward to the host; it owns the member list
-          for (const p of this.peers.values()) p.pipe.send({ t: 'join', code: this.code, member: { name: member.name, lang: member.lang } })
+          for (const p of this.peers.values()) p.pipe.send({ t: 'join', code: this.code, member: { id: member.id, name: member.name, lang: member.lang } })
         } else {
           this.broadcastRoom()
         }
