@@ -238,6 +238,23 @@ const wss = new WebSocketServer({ noServer: true })
 
 /* ── http ───────────────────────────────────────────── */
 
+function aiConfig() {
+  const cfg = config.read()
+  return {
+    key: cfg.openaiKey || process.env.OPENAI_API_KEY || '',
+    base: cfg.openaiBase || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+    model: cfg.openaiModel || process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  }
+}
+function context7Config() {
+  const cfg = config.read()
+  return {
+    key: cfg.context7Key || process.env.CONTEXT7_API_KEY || '',
+    base: cfg.context7Base || process.env.CONTEXT7_BASE_URL || 'https://context7.com',
+    path: cfg.context7Path || process.env.CONTEXT7_SEARCH_PATH || '/api/v1/search',
+  }
+}
+
 async function resolveNetwork(requested) {
   const cfg = config.read()
   if (requested && requested !== 'auto' && requested !== 'new') return requested
@@ -433,9 +450,8 @@ const server = http.createServer(async (req, res) => {
         const body = await readJson(req)
         const question = String(body.question || '').trim()
         if (!question) return sendJson(res, 400, { ok: false, error: 'question required' })
-        const key = process.env.OPENAI_API_KEY
-        const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
-        const model = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+        const { key, base: rawBase, model } = aiConfig()
+        const base = rawBase.replace(/\/$/, '')
         if (!key) return sendJson(res, 503, { ok: false, error: 'NIVIX offline: set OPENAI_API_KEY in agent/.env' })
         try {
           const r = await fetch(base + '/chat/completions', {
@@ -462,9 +478,8 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/wiki' && req.method === 'GET') {
         const q = url.searchParams.get('q') || ''
         if (!q) return sendJson(res, 400, { ok: false, error: 'q required' })
-        const key = process.env.CONTEXT7_API_KEY
-        const base = (process.env.CONTEXT7_BASE_URL || 'https://context7.com').replace(/\/$/, '')
-        const searchPath = process.env.CONTEXT7_SEARCH_PATH || '/api/v1/search'
+        const { key, base: rawBase, path: searchPath } = context7Config()
+        const base = rawBase.replace(/\/$/, '')
         if (!key) return sendJson(res, 503, { ok: false, error: 'Context7 offline: set CONTEXT7_API_KEY in agent/.env' })
         try {
           const r = await fetch(`${base}${searchPath}?query=${encodeURIComponent(q)}`, { headers: { authorization: `Bearer ${key}` } })
@@ -479,6 +494,27 @@ const server = http.createServer(async (req, res) => {
         } catch (e) {
           return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
         }
+      }
+
+      if (url.pathname === '/api/keys' && req.method === 'GET') {
+        const ai = aiConfig()
+        const c7 = context7Config()
+        return sendJson(res, 200, {
+          ok: true,
+          openaiSet: !!ai.key, openaiBase: ai.base, openaiModel: ai.model,
+          context7Set: !!c7.key,
+        })
+      }
+
+      if (url.pathname === '/api/keys' && req.method === 'POST') {
+        const body = await readJson(req)
+        const patch = {}
+        if (typeof body.openaiKey === 'string' && body.openaiKey.trim()) patch.openaiKey = body.openaiKey.trim()
+        if (typeof body.openaiBase === 'string' && body.openaiBase.trim()) patch.openaiBase = body.openaiBase.trim()
+        if (typeof body.openaiModel === 'string' && body.openaiModel.trim()) patch.openaiModel = body.openaiModel.trim()
+        if (typeof body.context7Key === 'string' && body.context7Key.trim()) patch.context7Key = body.context7Key.trim()
+        config.write(patch)
+        return sendJson(res, 200, { ok: true })
       }
 
       return sendJson(res, 404, { ok: false, error: 'unknown endpoint' })

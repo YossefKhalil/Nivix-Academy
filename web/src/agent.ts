@@ -101,3 +101,25 @@ export async function wikiSearch(q: string): Promise<{ ok: boolean; results?: { 
     return await (await fetch(url(`/api/wiki?q=${encodeURIComponent(q)}`))).json()
   } catch { return null }
 }
+
+export interface KeyStatus {
+  ok: boolean
+  openaiSet: boolean
+  openaiBase: string
+  openaiModel: string
+  context7Set: boolean
+}
+
+export async function getKeys(): Promise<KeyStatus | null> {
+  try { return await (await fetch(url('/api/keys'))).json() } catch { return null }
+}
+
+export async function saveKeys(keys: { openaiKey?: string; openaiBase?: string; openaiModel?: string; context7Key?: string }) {
+  try {
+    return await (await fetch(url('/api/keys'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(keys),
+    })).json()
+  } catch { return null }
+}

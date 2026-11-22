@@ -11,7 +11,7 @@ import { Animator, Dots, Text, useBleeps } from '@arwes/react'
 import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
-import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, wikiSearch, type AgentStatus } from './agent'
+import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, wikiSearch, getKeys, saveKeys, type AgentStatus } from './agent'
 import { useLiveRoom, createRoom, joinRoom, leaveRoom, getZt, setZtToken, createZtNetwork, relayCreate, relayJoin, relayLeave, type RoomMember } from './room'
 
 type Send = (a: Action) => void
@@ -972,13 +972,7 @@ function Brief({ s, send }: { s: State; send: Send }) {
 function LeftTabs({ s, send }: { s: State; send: Send }) {
   const [chat, setChat] = useState('')
   const [ask, setAsk] = useState('')
-  const docs = [
-    ['Python · http.server.BaseHTTPRequestHandler', 'context7'],
-    ['HTTP Authorization header / Basic scheme', 'MDN'],
-    ['base64 - encode & decode', 'Python docs'],
-    ['C# · System.Net.HttpListener', 'learn.microsoft.com'],
-    ['401 / 405 / 415 responses', 'RFC 9110'],
-  ]
+  const docs: [string, string][] = []
   const canAsk = s.energy >= COST_AI
   const [wikiQ, setWikiQ] = useState('')
   const [wikiResults, setWikiResults] = useState<{ title: string; url: string; source: string }[] | null>(null)
@@ -1511,15 +1505,17 @@ function Settings({ onClose }: { onClose: () => void }) {
     try { localStorage.setItem('duel.editor', v) } catch { /* ignore */ }
   }
 
-  const [token, setToken] = useState('')
-  const [zt, setZt] = useState<{ tokenSet: boolean; network: string | null } | null>(null)
-  const [ztNote, setZtNote] = useState<string | null>(null)
-  useEffect(() => { getZt().then(z => { if (z) setZt(z) }) }, [])
-  const saveToken = async () => {
-    if (!token.trim()) return
-    const r = await setZtToken(token.trim())
-    if (r?.ok) { setToken(''); setZt(await getZt()); setZtNote('token saved') }
-    else setZtNote(r?.error || 'token rejected')
+  const [keys, setKeys] = useState<{ openaiSet: boolean; openaiBase: string; openaiModel: string; context7Set: boolean } | null>(null)
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [openaiBase, setOpenaiBase] = useState('')
+  const [openaiModel, setOpenaiModel] = useState('')
+  const [context7Key, setContext7Key] = useState('')
+  const [keyNote, setKeyNote] = useState<string | null>(null)
+  useEffect(() => { getKeys().then(k => { if (k) { setKeys(k); setOpenaiBase(k.openaiBase || ''); setOpenaiModel(k.openaiModel || '') } }) }, [])
+  const saveKeysNow = async () => {
+    const r = await saveKeys({ openaiKey, openaiBase, openaiModel, context7Key })
+    if (r?.ok) { setOpenaiKey(''); setContext7Key(''); setKeys(await getKeys()); setKeyNote('saved') }
+    else setKeyNote(r?.error || 'could not save')
   }
 
   const EditorOption = ({ id, label, sub }: { id: string; label: string; sub?: string }) => {
@@ -1557,18 +1553,19 @@ function Settings({ onClose }: { onClose: () => void }) {
 
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>ZEROTIER</span>
-              <span className="font-mono text-[10px]" style={{ color: zt?.network ? 'var(--color-primary)' : 'var(--text-muted)' }}>{zt?.network || (zt?.tokenSet ? 'token set · no network' : 'no token')}</span>
+              <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>API KEYS</span>
+              <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>NIVIX {keys?.openaiSet ? 'ON' : 'OFF'} · WIKI {keys?.context7Set ? 'ON' : 'OFF'}</span>
             </div>
+            <input value={openaiKey} onChange={e => setOpenaiKey(e.target.value)} type="password" placeholder={keys?.openaiSet ? 'OpenAI key (saved)' : 'OpenAI-compatible API key'} className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
+            <div className="grid grid-cols-2 gap-2">
+              <input value={openaiBase} onChange={e => setOpenaiBase(e.target.value)} placeholder="base URL" className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
+              <input value={openaiModel} onChange={e => setOpenaiModel(e.target.value)} placeholder="model" className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
+            </div>
+            <input value={context7Key} onChange={e => setContext7Key(e.target.value)} type="password" placeholder={keys?.context7Set ? 'Context7 key (saved)' : 'Context7 API key'} className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
             <div className="flex items-center gap-2">
-              <input
-                value={token} onChange={e => setToken(e.target.value)} type="password" placeholder="central API token (legacy)"
-                className="flex-1 font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none"
-                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
-              />
-              <button onClick={saveToken} className="micro">SAVE</button>
+              <button onClick={saveKeysNow} className="micro">SAVE KEYS</button>
+              {keyNote && <span className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>{keyNote}</span>}
             </div>
-            {ztNote && <div className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>{ztNote}</div>}
           </section>
 
           <section className="flex flex-col gap-3">
