@@ -12,5 +12,7 @@ export default defineConfig({
   server: {
     // The lobby backdrop is a multi-MB video; don't let the watcher choke on it.
     watch: { ignored: ['**/public/media/**'] },
+    // The shared course content lives one level above the web root.
+    fs: { allow: ['..'] },
   },
 })

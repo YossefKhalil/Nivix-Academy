@@ -1,0 +1,167 @@
+{
+  "course": "HTTP & Networking",
+  "lessons": [
+    {
+      "id": 84,
+      "n": "84",
+      "title": "Watch List — OSI Model",
+      "tag": "OSI MODEL",
+      "kind": "reading",
+      "brief": "<p>Before writing any code, it helps to know <em>where</em> HTTP lives. The OSI model splits network communication into seven layers; HTTP is an <strong>application-layer</strong> (layer 7) protocol, and it relies on everything below it.</p><ul><li><strong>7 · Application</strong> — you are here. HTTP, DNS, TLS.</li><li><strong>6 · Presentation</strong> — encoding, compression, TLS records.</li><li><strong>5 · Session</strong> — connection state.</li><li><strong>4 · Transport</strong> — TCP/UDP. HTTP/1.1 rides on TCP: ordered, reliable bytes.</li><li><strong>3 · Network</strong> — IP addresses and routing between machines.</li><li><strong>1–2 · Link/Physical</strong> — Ethernet, Wi‑Fi, the wire.</li></ul><p>When your Python or C# server binds a port and someone connects, TCP (layer 4) has already done the handshake and guaranteed the bytes arrive. Your job is purely layer 7: read the request text, decide what it means, and write a response.</p><p><strong>Watch</strong> the OSI-model video for this lesson, then continue to <em>HTTP — Protocol Introduction</em>.</p>",
+      "hints": "<p>Nothing to build in this lesson — it is context. Press <em>Skip</em> if you already know the layers.</p>",
+      "starters": {},
+      "tests": []
+    },
+    {
+      "id": 85,
+      "n": "85",
+      "title": "HTTP — Protocol Introduction",
+      "tag": "PROTOCOL",
+      "kind": "code",
+      "port": 8081,
+      "brief": "<p>HTTP is a <strong>text-based request/response</strong> protocol. The client writes a request, the server writes a response. Both look like this:</p><pre><code>GET /health HTTP/1.1\\r\\n\nHost: 127.0.0.1:8081\\r\\n\n\\r\\n</code></pre><p>A request is <strong>request line</strong> (<code>METHOD PATH VERSION</code>), then zero or more <strong>headers</strong> (<code>Name: value</code>), then a blank line, then an optional body.</p><p>The response mirrors it: a <strong>status line</strong> (<code>HTTP/1.1 200 OK</code>), headers, a blank line, then the body. The <strong>status code</strong> carries the meaning: <code>2xx</code> success, <code>3xx</code> redirect, <code>4xx</code> your fault, <code>5xx</code> the server's fault.</p><p><strong>Task:</strong> bring up a server that answers <code>GET /</code> with <code>200</code> and a small plain-text body, and <code>GET /health</code> with <code>200</code> and the body <code>UP</code>. Anything else should be <code>404</code>.</p>",
+      "hints": "<p>Return <code>Content-Type: text/plain</code> so clients display the body as text.</p><p>Map paths explicitly; if no route matches, send <code>404</code> with a short message.</p>",
+      "starters": {
+        "python": "from http.server import BaseHTTPRequestHandler, HTTPServer\n\nclass Handler(BaseHTTPRequestHandler):\n    def log_message(self, *a):  # keep the console clean\n        pass\n\n    def _text(self, code, body=\"\"):\n        self.send_response(code)\n        self.send_header(\"Content-Type\", \"text/plain\")\n        self.end_headers()\n        self.wfile.write(body.encode())\n\n    def do_GET(self):\n        # TODO: route \"/\" and \"/health\"; 404 otherwise\n        self._text(200, \"OK\")\n\nif __name__ == \"__main__\":\n    HTTPServer((\"127.0.0.1\", 8081), Handler).serve_forever()\n",
+        "csharp": "using System.Net;\nusing System.Text;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\nConsole.WriteLine(\"listening on :8080\");\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    // TODO: route \"/\" and \"/health\"; 404 otherwise\n    ctx.Response.StatusCode = 200;\n    var body = Encoding.UTF8.GetBytes(\"OK\");\n    ctx.Response.ContentType = \"text/plain\";\n    ctx.Response.OutputStream.Write(body);\n    ctx.Response.Close();\n}\n"
+      },
+      "tests": [
+        { "name": "GET / -> 200 OK", "visible": true },
+        { "name": "GET / -> text/plain", "visible": true },
+        { "name": "GET /health -> body UP", "visible": true },
+        { "name": "GET /health -> 200", "visible": false },
+        { "name": "GET /nope -> 404", "visible": false }
+      ]
+    },
+    {
+      "id": 86,
+      "n": "86",
+      "title": "HTTP — Create HTTP Server",
+      "tag": "SERVER",
+      "kind": "code",
+      "port": 8081,
+      "brief": "<p>Now make the server do something useful: <strong>parse the request</strong> and <strong>write a real response</strong>. Every framework hides the same three steps — read the method and path, decide the status code, write headers then body.</p><p>Watch two details that trip people up:</p><ul><li>The <strong>path and query string</strong> are separate. <code>/echo?msg=hi</code> has path <code>/echo</code> and query <code>msg=hi</code>. Split on the first <code>?</code>.</li><li><strong>Never</strong> echo untrusted input without a status decision — a missing parameter is a client error, so it is <code>400</code>, not <code>200</code>.</li></ul><p><strong>Task:</strong> implement <code>GET /ping</code> → <code>200</code> body <code>pong</code>; <code>GET /echo?msg=X</code> → <code>200</code> body <code>X</code>; <code>GET /echo</code> with no <code>msg</code> → <code>400</code>; unknown paths → <code>404</code>.</p>",
+      "hints": "<p>Python: <code>urllib.parse.urlparse</code> splits <code>self.path</code> into <code>.path</code> and <code>.query</code>; <code>parse_qs</code> turns the query into a dict.</p><p>C#: <code>ctx.Request.Url.AbsolutePath</code> is the path; <code>ctx.Request.QueryString[\"msg\"]</code> is the parameter.</p><p>Set <code>Content-Length</code> when you know the body size; it is good hygiene.</p>",
+      "starters": {
+        "python": "from http.server import BaseHTTPRequestHandler, HTTPServer\nfrom urllib.parse import urlparse, parse_qs\n\nclass Handler(BaseHTTPRequestHandler):\n    def log_message(self, *a):\n        pass\n\n    def _text(self, code, body=\"\"):\n        self.send_response(code)\n        self.send_header(\"Content-Type\", \"text/plain\")\n        self.send_header(\"Content-Length\", str(len(body.encode())))\n        self.end_headers()\n        self.wfile.write(body.encode())\n\n    def do_GET(self):\n        u = urlparse(self.path)\n        # TODO: /ping, /echo, else 404\n        self._text(404, \"not found\")\n\nif __name__ == \"__main__\":\n    HTTPServer((\"127.0.0.1\", 8081), Handler).serve_forever()\n",
+        "csharp": "using System.Net;\nusing System.Text;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    var path = ctx.Request.Url!.AbsolutePath;\n    // TODO: /ping, /echo, else 404\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
+      },
+      "tests": [
+        { "name": "GET /ping -> pong", "visible": true },
+        { "name": "GET /echo?msg=hi -> hi", "visible": true },
+        { "name": "GET /echo (no msg) -> 400", "visible": true },
+        { "name": "GET /nope -> 404", "visible": false },
+        { "name": "GET /echo?msg= spaces preserved", "visible": false },
+        { "name": "GET /ping -> 200", "visible": false }
+      ]
+    },
+    {
+      "id": 87,
+      "n": "87",
+      "title": "HTTP — Multi Paths & Querystring",
+      "tag": "ROUTING",
+      "kind": "code",
+      "port": 8081,
+      "brief": "<p>A real server is a <strong>router</strong>: a table from (method, path) to a handler. The querystring is data, not identity — two requests to the same path with different queries hit the <em>same</em> handler.</p><p><strong>Task:</strong> build a small router. <code>GET /</code> → <code>200</code> and an index listing available routes. <code>GET /sum?a=2&amp;b=3</code> → <code>200</code> body <code>5</code> (parse both as integers). If <code>a</code> or <code>b</code> is missing or not a number → <code>400</code>. <code>GET /routes</code> → <code>200</code> and a comma-separated list <code>/,/sum,/routes</code>. Everything else → <code>404</code>.</p>",
+      "hints": "<p>Parse integers defensively — a query value is always a string. Python: <code>int(x)</code> inside <code>try/except ValueError</code>. C#: <code>int.TryParse</code>.</p><p>Order matters: check <code>a</code> and <code>b</code> presence before converting.</p>",
+      "starters": {
+        "python": "from http.server import BaseHTTPRequestHandler, HTTPServer\nfrom urllib.parse import urlparse, parse_qs\n\nclass Handler(BaseHTTPRequestHandler):\n    def log_message(self, *a):\n        pass\n\n    def _text(self, code, body=\"\"):\n        self.send_response(code)\n        self.send_header(\"Content-Type\", \"text/plain\")\n        self.end_headers()\n        self.wfile.write(body.encode())\n\n    def do_GET(self):\n        u = urlparse(self.path)\n        q = parse_qs(u.query)\n        # TODO: /, /sum?a=&b=, /routes, else 404\n        self._text(404, \"not found\")\n\nif __name__ == \"__main__\":\n    HTTPServer((\"127.0.0.1\", 8081), Handler).serve_forever()\n",
+        "csharp": "using System.Net;\nusing System.Text;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    var path = ctx.Request.Url!.AbsolutePath;\n    var q = ctx.Request.QueryString;\n    // TODO: /, /sum?a=&b=, /routes, else 404\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
+      },
+      "tests": [
+        { "name": "GET /sum?a=2&b=3 -> 5", "visible": true },
+        { "name": "GET /sum?a=x -> 400", "visible": true },
+        { "name": "GET /routes -> list of paths", "visible": true },
+        { "name": "GET / -> 200", "visible": false },
+        { "name": "GET /sum (missing b) -> 400", "visible": false }
+      ]
+    },
+    {
+      "id": 88,
+      "n": "88",
+      "title": "HTTP — Basic Authorization",
+      "tag": "AUTH",
+      "kind": "code",
+      "port": 8081,
+      "brief": "<p><strong>Basic auth</strong> puts credentials in a header: <code>Authorization: Basic base64(user:password)</code>. The server decodes the base64, splits on the first <code>:</code>, and compares.</p><p>Three rules for a correct implementation:</p><ul><li>Missing or bad credentials → <code>401</code> <em>and</em> a <code>WWW-Authenticate: Basic realm=\"...\"</code> header. Without the header, clients do not know how to authenticate.</li><li>Decode defensively: malformed base64 or a value with no <code>:</code> is a <code>401</code>, never a crash.</li><li>The scheme is <strong>case-insensitive</strong> (<code>basic</code> is valid), and the method must match — <code>POST /admin</code> is <code>405</code>, not <code>401</code>.</li></ul><p><strong>Task:</strong> protect <code>GET /admin</code> with user <code>nova</code> and password <code>duel</code>. Valid → <code>200</code> body <code>welcome, nova</code>. Anything else → <code>401</code> with the challenge header.</p>",
+      "hints": "<p>Python: <code>import base64</code>; <code>base64.b64decode(value, validate=True)</code> raises on garbage — treat that as 401.</p><p>C#: <code>Convert.FromBase64String</code> throws <code>FormatException</code>; wrap it.</p><p>Split credentials on the <em>first</em> colon only: <code>user:pass:extra</code> has password <code>pass:extra</code>.</p>",
+      "starters": {
+        "python": "import base64\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\n\nUSER, PASS = \"nova\", \"duel\"\n\nclass Handler(BaseHTTPRequestHandler):\n    def log_message(self, *a):\n        pass\n\n    def _challenge(self):\n        self.send_response(401)\n        self.send_header(\"WWW-Authenticate\", 'Basic realm=\"admin\"')\n        self.end_headers()\n\n    def _text(self, code, body=\"\"):\n        self.send_response(code)\n        self.send_header(\"Content-Type\", \"text/plain\")\n        self.end_headers()\n        self.wfile.write(body.encode())\n\n    def do_GET(self):\n        # TODO: protect /admin\n        self._text(404, \"not found\")\n\nif __name__ == \"__main__\":\n    HTTPServer((\"127.0.0.1\", 8081), Handler).serve_forever()\n",
+        "csharp": "using System.Net;\nusing System.Text;\n\nconst string USER = \"nova\", PASS = \"duel\";\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    // TODO: protect /admin\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
+      },
+      "tests": [
+        { "name": "GET /admin, no auth -> 401", "visible": true },
+        { "name": "GET /admin, valid -> 200", "visible": true },
+        { "name": "401 sends WWW-Authenticate: Basic", "visible": true },
+        { "name": "wrong user -> 401", "visible": false },
+        { "name": "wrong password -> 401", "visible": false },
+        { "name": "POST /admin -> 405", "visible": false },
+        { "name": "malformed base64 -> 401", "visible": false },
+        { "name": "lowercase scheme -> 200", "visible": false }
+      ]
+    },
+    {
+      "id": 89,
+      "n": "89",
+      "title": "HTTP — Bearer Authorization (Token)",
+      "tag": "TOKEN",
+      "kind": "code",
+      "port": 8081,
+      "brief": "<p><strong>Bearer tokens</strong> replace passwords with an opaque string: <code>Authorization: Bearer &lt;token&gt;</code>. The server checks the token, not a username/password pair. \"Bearer\" means <em>whoever holds it</em> is granted access — which is why tokens are secret and short-lived.</p><p><strong>Task:</strong> protect <code>GET /data</code>. Valid token <code>nivix-secret</code> → <code>200</code> with a JSON body <code>{\"ok\":true}</code> and <code>Content-Type: application/json</code>. Missing, wrong token, or the wrong scheme → <code>401</code> with <code>WWW-Authenticate: Bearer</code>.</p><p>Compare tokens with a constant-time comparison when it matters (e.g. <code>hmac.compare_digest</code> / <code>CryptographicOperations.FixedTimeEquals</code>) to avoid timing leaks.</p>",
+      "hints": "<p>Split the header into exactly two parts: <code>scheme</code> and <code>credentials</code>. More or fewer → 401.</p><p>The scheme comparison is case-insensitive; the token comparison is exact.</p>",
+      "starters": {
+        "python": "from http.server import BaseHTTPRequestHandler, HTTPServer\n\nTOKEN = \"nivix-secret\"\n\nclass Handler(BaseHTTPRequestHandler):\n    def log_message(self, *a):\n        pass\n\n    def _challenge(self):\n        self.send_response(401)\n        self.send_header(\"WWW-Authenticate\", \"Bearer\")\n        self.end_headers()\n\n    def _json(self, code, body):\n        self.send_response(code)\n        self.send_header(\"Content-Type\", \"application/json\")\n        self.end_headers()\n        self.wfile.write(body.encode())\n\n    def do_GET(self):\n        # TODO: protect /data\n        self._json(404, '{\"error\":\"not found\"}')\n\nif __name__ == \"__main__\":\n    HTTPServer((\"127.0.0.1\", 8081), Handler).serve_forever()\n",
+        "csharp": "using System.Net;\nusing System.Text;\n\nconst string TOKEN = \"nivix-secret\";\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    // TODO: protect /data\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
+      },
+      "tests": [
+        { "name": "GET /data, no auth -> 401", "visible": true },
+        { "name": "GET /data, valid bearer -> 200", "visible": true },
+        { "name": "401 sends WWW-Authenticate: Bearer", "visible": true },
+        { "name": "wrong token -> 401", "visible": false },
+        { "name": "wrong scheme (Basic) -> 401", "visible": false },
+        { "name": "valid -> JSON content-type", "visible": false }
+      ]
+    },
+    {
+      "id": 90,
+      "n": "90",
+      "title": "HTTP — Create HTTP Client",
+      "tag": "CLIENT",
+      "kind": "code",
+      "port": 8081,
+      "brief": "<p>Servers are also clients. A <strong>proxy</strong> endpoint receives a request, makes an <em>outbound</em> request of its own, and returns the result. This is the heart of gateways, webhooks and API aggregators.</p><p><strong>Task:</strong> implement <code>GET /fetch?url=&lt;url&gt;</code>. Your server should perform a GET to that URL and return the upstream <strong>status code</strong> and <strong>body</strong>. If <code>url</code> is missing → <code>400</code>. If the outbound request fails → <code>502</code>.</p><p>The judge will ask your server to fetch <em>its own</em> <code>/ping</code>, so a working server must be able to talk to itself.</p>",
+      "hints": "<p>Python: <code>urllib.request.urlopen(url, timeout=5).read()</code>. Catch <code>URLError</code> → 502.</p><p>C#: <code>new HttpClient().GetStringAsync(url)</code> inside a <code>try/catch</code>.</p><p>Never blindly trust the <code>url</code> parameter in production (SSRF) — here it is local, but say so in a comment.</p>",
+      "starters": {
+        "python": "from http.server import BaseHTTPRequestHandler, HTTPServer\nfrom urllib.parse import urlparse, parse_qs\nimport urllib.request, urllib.error\n\nclass Handler(BaseHTTPRequestHandler):\n    def log_message(self, *a):\n        pass\n\n    def _text(self, code, body=\"\"):\n        self.send_response(code)\n        self.send_header(\"Content-Type\", \"text/plain\")\n        self.end_headers()\n        self.wfile.write(body.encode())\n\n    def do_GET(self):\n        u = urlparse(self.path)\n        q = parse_qs(u.query)\n        if u.path == \"/ping\":\n            return self._text(200, \"pong\")\n        if u.path == \"/fetch\":\n            # TODO: fetch q[\"url\"] and return status + body\n            return self._text(400, \"url required\")\n        self._text(404, \"not found\")\n\nif __name__ == \"__main__\":\n    HTTPServer((\"127.0.0.1\", 8081), Handler).serve_forever()\n",
+        "csharp": "using System.Net;\nusing System.Text;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\nvar client = new HttpClient();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    var path = ctx.Request.Url!.AbsolutePath;\n    if (path == \"/ping\") { /* TODO */ }\n    // TODO: /fetch?url=\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
+      },
+      "tests": [
+        { "name": "GET /fetch?url=.../ping -> body pong", "visible": true },
+        { "name": "GET /fetch (no url) -> 400", "visible": true },
+        { "name": "GET /ping still works", "visible": false },
+        { "name": "unreachable upstream -> 502", "visible": false }
+      ]
+    },
+    {
+      "id": 91,
+      "n": "91",
+      "title": "HTTP — POST Request",
+      "tag": "BODY",
+      "kind": "code",
+      "port": 8081,
+      "brief": "<p><code>POST</code> carries a <strong>body</strong>. With a GET the meaning lives in the URL; with a POST the payload is in the body and its type is declared by <code>Content-Type</code>. If the server does not support the type it should say <code>415 Unsupported Media Type</code> — not silently misparse it.</p><p><strong>Task:</strong> implement <code>POST /submit</code> accepting <code>application/json</code> of the form <code>{\"name\":\"...\",\"score\":&lt;int&gt;}</code> and answering <code>200</code> with <code>{\"ok\":true,\"score\":&lt;int&gt;}</code>. Rules: wrong/missing <code>Content-Type</code> → <code>415</code>; body that is not valid JSON or is missing fields → <code>400</code>; <code>GET /submit</code> → <code>405</code>.</p><p>Read exactly <code>Content-Length</code> bytes — the body is a stream, not a line.</p>",
+      "hints": "<p>Python: <code>self.headers.get(\"Content-Length\")</code>, then <code>self.rfile.read(n)</code>, then <code>json.loads</code>; catch <code>ValueError</code>/<code>KeyError</code> → 400.</p><p>C#: read the request stream to <code>ContentLength64</code> bytes; <code>System.Text.Json.JsonDocument.Parse</code>.</p><p>Check <code>Content-Type</code> starts with <code>application/json</code> before parsing.</p>",
+      "starters": {
+        "python": "import json\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\n\nclass Handler(BaseHTTPRequestHandler):\n    def log_message(self, *a):\n        pass\n\n    def _json(self, code, obj):\n        body = json.dumps(obj).encode()\n        self.send_response(code)\n        self.send_header(\"Content-Type\", \"application/json\")\n        self.send_header(\"Content-Length\", str(len(body)))\n        self.end_headers()\n        self.wfile.write(body)\n\n    def do_POST(self):\n        # TODO: /submit\n        self._json(404, {\"error\": \"not found\"})\n\nif __name__ == \"__main__\":\n    HTTPServer((\"127.0.0.1\", 8081), Handler).serve_forever()\n",
+        "csharp": "using System.Net;\nusing System.Text;\nusing System.Text.Json;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    // TODO: POST /submit\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
+      },
+      "tests": [
+        { "name": "POST /submit (valid JSON) -> 200", "visible": true },
+        { "name": "POST /submit (bad JSON) -> 400", "visible": true },
+        { "name": "POST /submit (missing fields) -> 400", "visible": false },
+        { "name": "POST /submit (wrong content-type) -> 415", "visible": false },
+        { "name": "GET /submit -> 405", "visible": false }
+      ]
+    }
+  ]
+}

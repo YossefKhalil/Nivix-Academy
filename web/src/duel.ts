@@ -3,8 +3,8 @@
    Pure logic only; the React layer lives in App.tsx. */
 
 export type Lang = 'python' | 'csharp'
-export interface Test { name: string; visible: boolean; pass: boolean }
-export interface RoundDef { tag: string; title: string; brief: string; hints: string; tests: Test[] }
+export interface Test { name: string; visible?: boolean; pass?: boolean }
+export interface RoundDef { tag: string; title: string; brief: string; hints: string; tests: Test[]; id?: number; port?: number }
 
 export const SECTOR = 'HTTP & NETWORKING'
 export const ENERGY_MAX = 10
@@ -12,101 +12,9 @@ export const COST_HINT = 1
 export const COST_AI = 6
 export const RECHARGE_SEC = 8
 
-export const ROUNDS: RoundDef[] = [
-  {
-    tag: 'PROTOCOL', title: 'HTTP Protocol',
-    brief: `<p>Make your server speak raw HTTP on <code>127.0.0.1:8081</code> (Python) or <code>:8080</code> (C#).</p>
-      <ul><li><code>GET /</code> &rarr; <code>200 OK</code> + <code>Content-Type: text/plain</code></li>
-      <li><code>GET /ping</code> &rarr; body <code>pong</code></li>
-      <li>unknown path &rarr; <code>404</code></li>
-      <li><code>/echo?msg=hi</code> &rarr; body <code>hi</code>; missing <code>msg</code> &rarr; <code>400</code></li></ul>`,
-    hints: `<p>Status line first, then headers, then a blank line, then the body. Read the request line to route. Percent-decode query values.</p>`,
-    tests: [
-      { name: 'GET / -> 200 OK', visible: true, pass: true },
-      { name: 'GET / Content-Type: text/plain', visible: true, pass: true },
-      { name: 'GET /ping -> "pong"', visible: true, pass: true },
-      { name: 'GET /nope -> 404', visible: true, pass: true },
-      { name: 'GET /echo?msg=hi -> "hi"', visible: true, pass: true },
-      { name: 'GET /echo (no msg) -> 400', visible: true, pass: true },
-      { name: 'HEAD / -> 200, no body', visible: false, pass: false },
-      { name: 'GET // -> 400 or 404', visible: false, pass: true },
-    ],
-  },
-  {
-    tag: 'BASIC AUTH', title: 'Basic Authorization',
-    brief: `<p>Protect <code>/admin</code> with HTTP Basic auth. Valid user <code>nova:duel</code>.</p>
-      <ul><li>no / wrong credentials &rarr; <code>401</code></li>
-      <li>401 must include <code>WWW-Authenticate: Basic realm="admin"</code></li>
-      <li>valid credentials &rarr; <code>200</code></li>
-      <li>decode <code>base64</code>, split on the first colon, compare</li></ul>`,
-    hints: `<p>The header is <code>Authorization: Basic &lt;base64(user:pass)&gt;</code>. The scheme is case-insensitive. Send the challenge header on every 401.</p>`,
-    tests: [
-      { name: 'GET /admin, no auth -> 401', visible: true, pass: true },
-      { name: 'GET /admin, wrong user -> 401', visible: true, pass: true },
-      { name: 'GET /admin, wrong pass -> 401', visible: true, pass: true },
-      { name: 'GET /admin, valid -> 200', visible: true, pass: true },
-      { name: '401 sends WWW-Authenticate', visible: true, pass: false },
-      { name: 'POST /admin -> 405', visible: true, pass: true },
-      { name: 'GET /other -> 404', visible: true, pass: true },
-      { name: 'malformed base64 -> 401', visible: true, pass: false },
-      { name: 'scheme "basic" lowercase -> ok', visible: true, pass: true },
-      { name: 'empty header value -> 401', visible: false, pass: true },
-      { name: '1KB token -> 401', visible: false, pass: false },
-      { name: 'unicode password -> 401', visible: false, pass: true },
-    ],
-  },
-  {
-    tag: 'POST REQUEST', title: 'POST & JSON',
-    brief: `<p>Accept JSON on <code>POST /echo</code> and return it back.</p>
-      <ul><li>valid JSON &rarr; <code>201</code> + <code>Content-Type: application/json</code></li>
-      <li>malformed JSON &rarr; <code>400</code>; wrong content-type &rarr; <code>415</code></li>
-      <li>body larger than 1MB &rarr; <code>413</code></li>
-      <li>GET on <code>/echo</code> &rarr; <code>405</code></li></ul>`,
-    hints: `<p>Read <code>Content-Length</code>, then read exactly that many bytes. Parse before you route a response. Cap the body size.</p>`,
-    tests: [
-      { name: 'POST /echo valid JSON -> 201', visible: true, pass: true },
-      { name: 'response echoes the fields', visible: true, pass: true },
-      { name: 'Content-Type: application/json', visible: true, pass: true },
-      { name: 'wrong content-type -> 415', visible: true, pass: false },
-      { name: 'malformed JSON -> 400', visible: true, pass: true },
-      { name: 'missing required field -> 422', visible: true, pass: true },
-      { name: 'body > 1MB -> 413', visible: true, pass: false },
-      { name: 'GET /echo -> 405', visible: true, pass: true },
-      { name: 'unicode JSON round-trip', visible: true, pass: true },
-      { name: 'empty body -> 400', visible: false, pass: true },
-    ],
-  },
-]
-
-export const PY_CODE = `from http.server import BaseHTTPRequestHandler, HTTPServer
-import base64, json
-
-USERS = {"nova": "duel"}
-
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        # TODO: route /admin with Basic auth
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"OK")
-
-if __name__ == "__main__":
-    HTTPServer(("127.0.0.1", 8081), Handler).serve_forever()`
-
-export const CS_CODE = `using System.Net;
-
-var listener = new HttpListener();
-listener.Prefixes.Add("http://localhost:8080/");
-listener.Start();
-
-while (true)
-{
-    var ctx = listener.GetContext();
-    // TODO: route /admin with Basic auth
-    ctx.Response.StatusCode = 200;
-    ctx.Response.Close();
-}`
+/* Course content (briefs, starters, tests) comes from the shared content file. */
+import { ROUNDS, PY_CODE, CS_CODE, LESSONS } from './content'
+export { ROUNDS, PY_CODE, CS_CODE, LESSONS }
 
 const OPP_LINES = ['ready when you are', 'this one is tricky', 'my server is up', 'good luck :)', 'submitted, beat that', '401 everywhere lol']
 
@@ -145,7 +53,7 @@ export function initial(): State {
     me: { name: 'NOVA', lang: 'python', ready: false, submitted: false, score: null, stage: 0 },
     opp: { name: 'KAI', lang: 'csharp', ready: false, submitted: false, score: null, stage: 0, joined: false, connected: true },
     role: null, lobbyTab: 'host', room: { code: '7F3K', link: 'http://100.101.102.103:4318/7F3K' },
-    round: 1, totalRounds: 3, seed: 4821, sector: SECTOR,
+    round: 1, totalRounds: ROUNDS.length, seed: 4821, sector: SECTOR,
     elapsed: 0,
     leftTab: 'comms',
     hintsOpen: false, energy: ENERGY_MAX, hintsPaid: false,
