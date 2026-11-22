@@ -751,7 +751,7 @@ function Lobby({ s, send, agent, onSettings }: { s: State; send: Send; agent: Ag
                 {isHost
                   ? <Button shape="flat" className="!mb-0 !px-5 !py-1.5" disabled={!canStart || busy} onClick={() => send({ type: 'START' })}>{canStart ? 'START MATCH' : 'WAITING FOR PLAYERS'}</Button>
                   : <span className="font-mono text-[10px] tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>WAITING FOR HOST TO START</span>}
-                <button onClick={doLeave} className="micro">LEAVE</button>
+                <Button shape="flat" variant="secondary" className="!mb-0 !px-5 !py-1.5" onClick={doLeave}>LEAVE</Button>
               </div>
             </>
           )}
@@ -1185,6 +1185,17 @@ function Settings({ onClose }: { onClose: () => void }) {
     try { localStorage.setItem('duel.editor', v) } catch { /* ignore */ }
   }
 
+  const [token, setToken] = useState('')
+  const [zt, setZt] = useState<{ tokenSet: boolean; network: string | null } | null>(null)
+  const [ztNote, setZtNote] = useState<string | null>(null)
+  useEffect(() => { getZt().then(z => { if (z) setZt(z) }) }, [])
+  const saveToken = async () => {
+    if (!token.trim()) return
+    const r = await setZtToken(token.trim())
+    if (r?.ok) { setToken(''); setZt(await getZt()); setZtNote('token saved') }
+    else setZtNote(r?.error || 'token rejected')
+  }
+
   const EditorOption = ({ id, label, sub }: { id: string; label: string; sub?: string }) => {
     const active = editor === id
     return (
@@ -1216,6 +1227,22 @@ function Settings({ onClose }: { onClose: () => void }) {
               <EditorOption id="cursor" label="CURSOR" />
               <EditorOption id="codium" label="VSCODIUM" />
             </div>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>ZEROTIER</span>
+              <span className="font-mono text-[10px]" style={{ color: zt?.network ? 'var(--color-primary)' : 'var(--text-muted)' }}>{zt?.network || (zt?.tokenSet ? 'token set · no network' : 'no token')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={token} onChange={e => setToken(e.target.value)} type="password" placeholder="central API token (legacy)"
+                className="flex-1 font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+              />
+              <button onClick={saveToken} className="micro">SAVE</button>
+            </div>
+            {ztNote && <div className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>{ztNote}</div>}
           </section>
 
           <section className="flex flex-col gap-3">

@@ -237,5 +237,6 @@ export class Room {
     this.round = 1
     this.code = null
     this.role = null
+    this.broadcastRoom()
   }
 }
