@@ -812,7 +812,7 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
   if (!started) {
     return (
       <button onClick={() => setStarted(true)} className="relative block w-full overflow-hidden cursor-pointer bg-transparent p-0" style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }} title={video.label || 'Play lesson clip'}>
-        <img src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.6 }} />
+        <img src={`https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.6 }} />
         <span className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(180deg, rgba(4,7,12,0.15), rgba(4,7,12,0.78))' }}>
           <span className="flex items-center justify-center w-12 h-12 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 90%, transparent)', color: '#04070c', fontSize: 16, boxShadow: '0 0 24px color-mix(in oklab, var(--color-primary) 45%, transparent)' }}>▶</span>
           <span className="font-mono text-[9px] tracking-[0.14em] px-2 text-center" style={{ color: 'var(--text-secondary)' }}>WATCH · {video.label || 'LESSON CLIP'}</span>
@@ -825,15 +825,14 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
   const src = `https://www.youtube.com/embed/${video.id}?start=${video.start}&end=${video.end}&rel=0&modestbranding=1&playsinline=1${nonce ? '&autoplay=1' : ''}`
   return (
     <div className="flex flex-col overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-      <div className="relative w-full" style={{ aspectRatio: '16 / 9', background: '#000' }}>
+      <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000' }}>
         <iframe
           key={nonce}
-          className="absolute inset-0 w-full h-full"
           src={src}
           title={video.label || 'Lesson clip'}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
-          style={{ border: 0 }}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
         />
       </div>
       <div className="flex items-center gap-2 px-2.5 py-2" style={{ background: 'var(--surface-raised)', borderTop: '1px solid var(--border)' }}>
