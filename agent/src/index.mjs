@@ -113,7 +113,7 @@ libztAvailable().then(v => { libztReady = v })
 const config = createConfig(AGENT_ROOT)
 
 const relay = new RelayClient({
-  onMessage: msg => room.broadcastLocal({ t: 'relay', payload: msg }),
+  onMessage: msg => room.broadcastLocal({ t: 'relay', payload: { ...msg, you: relay.id } }),
   onStatus: () => room.broadcastLocal({ t: 'relay-status', status: relay.status }),
 })
 

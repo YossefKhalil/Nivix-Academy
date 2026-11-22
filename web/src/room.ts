@@ -51,6 +51,22 @@ export const getZt = () => get('/api/zt')
 export const setZtToken = (token: string) => post('/api/zt/token', { token })
 export const createZtNetwork = (opts?: { name?: string; public?: boolean }) => post('/api/zt/network', opts)
 
+export const relayCreate = (opts: { relayUrl: string; maxPlayers?: number; name?: string; lang?: string }) => post('/api/relay/room', opts)
+export const relayJoin = (opts: { relayUrl: string; code: string; name?: string; lang?: string }) => post('/api/relay/join', opts)
+export const relayLeave = () => post('/api/relay/leave')
+
+function normalizeRelay(r: any, you?: string): RoomState {
+  return {
+    code: r.code, mode: 'multi', network: null, maxPlayers: r.maxPlayers || 8,
+    role: you && r.hostId === you ? 'host' : 'guest', hostId: r.hostId || null,
+    started: !!r.match?.active, round: r.match?.round || 1,
+    memberCount: r.memberCount || (r.members?.length ?? 0), transport: 'relay', address: null,
+    members: (r.members || []).map((m: any) => ({
+      id: m.id, name: m.name, lang: m.lang, ready: !!m.ready, host: !!m.host, connected: m.online !== false,
+    })),
+  }
+}
+
 function wsUrl() {
   if (BASE) return BASE.replace(/^http/, 'ws') + '/ws/local'
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -61,6 +77,7 @@ export function useLiveRoom() {
   const [room, setRoom] = useState<RoomState | null>(null)
   const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
+  const sourceRef = useRef<'none' | 'local' | 'relay'>('none')
 
   useEffect(() => {
     let ws: WebSocket | null = null
@@ -72,9 +89,16 @@ export function useLiveRoom() {
       wsRef.current = ws
       ws.onopen = () => setConnected(true)
       ws.onmessage = ev => {
-        let msg: { t?: string; room?: RoomState }
+        let msg: any
         try { msg = JSON.parse(ev.data) } catch { return }
-        if ((msg.t === 'room' || msg.t === 'hello') && msg.room) setRoom(msg.room)
+        if (msg.t === 'relay' && msg.payload?.t === 'room' && msg.payload.room) {
+          sourceRef.current = 'relay'
+          setRoom(normalizeRelay(msg.payload.room, msg.payload.you))
+        } else if (msg.t === 'relay-status') {
+          if (!msg.status?.connected) sourceRef.current = 'none'
+        } else if ((msg.t === 'room' || msg.t === 'hello') && msg.room && sourceRef.current !== 'relay') {
+          setRoom(msg.room as RoomState)
+        }
       }
       ws.onclose = () => {
         setConnected(false)

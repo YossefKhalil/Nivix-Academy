@@ -10,6 +10,7 @@ export class RelayClient {
     this.ws = null
     this.url = null
     this.room = null
+    this.you = null
     this.id = 'p' + Math.random().toString(36).slice(2, 8)
   }
 
@@ -52,7 +53,8 @@ export class RelayClient {
         let msg
         try { msg = JSON.parse(data.toString()) } catch { return }
         if (msg.t === 'room' || msg.t === 'hello') this.room = msg.room
-        this.onMessage(msg)
+        if (msg.you) this.you = msg.you
+        this.onMessage({ ...msg, you: this.you })
         this.onStatus()
       })
       ws.on('close', () => { this.ws = null; this.onStatus() })
