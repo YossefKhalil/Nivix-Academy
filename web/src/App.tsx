@@ -901,47 +901,33 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
   }
 
   return (
-    <div className="relative w-full overflow-hidden select-none" style={{ aspectRatio: '16 / 9', background: '#000', border: '1px solid var(--border)' }}>
-      <div ref={hostRef} className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }} />
-
-      {/* full click surface blocks YouTube's own controls/title */}
-      <div className="absolute inset-0 cursor-pointer" onClick={toggle} />
-
-      {/* paused veil hides YouTube's pause + end-screen UI */}
-      {!playing && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ background: 'var(--surface)' }}>
-          <span className="flex items-center justify-center w-14 h-14 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 90%, transparent)', color: '#04070c', fontSize: 20, boxShadow: '0 0 28px color-mix(in oklab, var(--color-primary) 50%, transparent)' }}>▶</span>
-        </div>
-      )}
-
-      {/* top chrome */}
-      <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-3 pointer-events-none" style={{ height: 46, background: 'var(--surface)' }}>
-        <span className="font-mono text-[9px] tracking-[0.12em] truncate" style={{ color: 'var(--text-secondary)' }}>{video.label || 'LESSON CLIP'}</span>
-        <span className="font-mono text-[8px] shrink-0" style={{ color: 'var(--text-muted)' }}>{clock(video.start)}–{clock(video.end)}</span>
+    <div className="flex flex-col overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+      <div className="relative w-full" style={{ aspectRatio: '16 / 9', background: '#000' }}>
+        <div ref={hostRef} className="absolute inset-0" style={{ pointerEvents: 'none' }} />
       </div>
-
-      {/* bottom controls */}
-      <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2 pt-3" style={{ background: 'var(--surface)' }} onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-2 px-2.5 py-2" style={{ background: 'var(--surface-raised)', borderTop: '1px solid var(--border)' }}>
+        <span className="font-mono text-[9px] tracking-[0.12em] shrink-0 hidden xl:inline" style={{ color: 'var(--text-muted)' }}>{(video.label || 'CLIP').toUpperCase()}</span>
+        <button onClick={toggle} className="grid place-items-center w-7 h-7 shrink-0 cursor-pointer" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 14%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)' }}>
+          {playing ? '❚❚' : '▶'}
+        </button>
+        <button
+          onClick={() => { const p = playerRef.current; if (p) { p.seekTo(video.start, true); p.playVideo() } }}
+          className="grid place-items-center w-7 h-7 shrink-0 cursor-pointer font-mono text-[12px]"
+          style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+          title="restart clip"
+        >⟲</button>
         <div
           ref={seekRef}
-          className="relative h-[4px] mb-2 cursor-pointer"
-          style={{ background: 'rgba(255,255,255,0.18)' }}
+          className="relative flex-1 h-[6px] cursor-pointer"
+          style={{ background: 'color-mix(in oklab, var(--border) 80%, transparent)' }}
           onPointerDown={e => { e.stopPropagation(); seekTo(e.clientX) }}
           onPointerMove={e => { if (e.buttons === 1) seekTo(e.clientX) }}
         >
-          <span className="absolute inset-y-0 left-0" style={{ width: `${Math.min(100, progress * 100)}%`, background: 'var(--color-primary)' }} />
-          <span className="absolute top-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full" style={{ left: `calc(${Math.min(100, progress * 100)}% - 4px)`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 60%, transparent)' }} />
+          <span className="absolute inset-y-0 left-0" style={{ width: `${Math.min(100, progress * 100)}%`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 55%, transparent)' }} />
+          <span className="absolute top-1/2 -translate-y-1/2 w-[10px] h-[10px] rounded-full" style={{ left: `calc(${Math.min(100, progress * 100)}% - 5px)`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 60%, transparent)' }} />
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={e => { e.stopPropagation(); toggle() }} className="grid place-items-center w-7 h-7 cursor-pointer" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 14%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)' }}>
-            {playing ? '❚❚' : '▶'}
-          </button>
-          <button onClick={e => { e.stopPropagation(); toggleMute() }} className="grid place-items-center w-7 h-7 cursor-pointer font-mono text-[10px]" style={{ color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border)' }}>
-            {muted ? '🔇' : '🔊'}
-          </button>
-          <span className="flex-1" />
-          <span className="font-mono text-[9px]" style={{ color: 'var(--text-secondary)' }}>{clock(video.start + progress * span)} <span style={{ color: 'var(--text-muted)' }}>/ {clock(video.end)}</span></span>
-        </div>
+        <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{clock(video.start + progress * span)} <span style={{ color: 'var(--text-muted)' }}>/ {clock(video.end)}</span></span>
+        <button onClick={toggleMute} className="grid place-items-center w-7 h-7 shrink-0 cursor-pointer font-mono text-[10px]" style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>{muted ? '🔇' : '🔊'}</button>
       </div>
     </div>
   )
@@ -994,24 +980,35 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
 
       {s.leftTab === 'comms' && (
         <>
+          <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 shrink-0">
+            <span className="w-1 h-3 shrink-0" style={{ background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 60%, transparent)' }} />
+            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>LIVE CHANNEL</span>
+            <span className="flex-1" />
+            <span className="font-mono text-[9px]" style={{ color: 'var(--color-green)' }}>{s.chat.length} MSG</span>
+          </div>
           <div className="flex-1 overflow-auto px-3 py-2 flex flex-col gap-2">
-            {s.chat.length === 0 && <div className="font-mono text-[10px] py-3 text-center" style={{ color: 'var(--text-muted)' }}>no traffic yet</div>}
+            {s.chat.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 py-6">
+                <span className="font-orbitron text-[22px]" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>◌</span>
+                <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>no traffic yet — say hi</span>
+              </div>
+            )}
             {s.chat.map((m, i) => m.sys
               ? <div key={i} className="flex items-center gap-2 py-0.5">
-                <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
+                <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, transparent, var(--border))' }} />
                 <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{m.text}</span>
-                <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
+                <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, var(--border), transparent)' }} />
               </div>
               : m.me
-                ? <div key={i} className="self-end max-w-[85%] flex flex-col items-end gap-0.5">
-                  <span className="font-mono text-[9px]" style={{ color: 'var(--color-green)' }}>{m.who}</span>
-                  <div className="px-2.5 py-1.5 font-roboto text-[12px]" style={{ background: 'color-mix(in oklab, var(--color-primary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)', color: 'var(--text-secondary)', borderRadius: 3 }}>{m.text}</div>
+                ? <div key={i} className="self-end max-w-[85%] flex flex-col items-end gap-1">
+                  <span className="font-mono text-[9px]" style={{ color: 'var(--color-primary)' }}>{m.who}</span>
+                  <div className="px-3 py-1.5 font-roboto text-[12px]" style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--color-primary) 20%, transparent), color-mix(in oklab, var(--color-primary) 8%, transparent))', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)', color: 'var(--text-secondary)', borderRadius: 4, clipPath: 'polygon(0 0, 100% 0, 100% 100%, 6px 100%, 0 calc(100% - 6px))' }}>{m.text}</div>
                 </div>
-                : <div key={i} className="self-start max-w-[85%] flex gap-1.5">
-                  <span className="w-5 h-5 flex items-center justify-center font-mono text-[9px] shrink-0" style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', color: 'var(--color-primary)' }}>{m.who?.slice(0, 1)}</span>
-                  <div className="flex flex-col gap-0.5">
+                : <div key={i} className="self-start max-w-[85%] flex gap-2">
+                  <span className="w-6 h-6 flex items-center justify-center font-orbitron text-[10px] shrink-0" style={{ background: 'color-mix(in oklab, var(--surface-raised) 90%, black)', border: '1px solid color-mix(in oklab, var(--accent-secondary) 40%, transparent)', color: 'var(--accent-secondary)' }}>{m.who?.slice(0, 1)}</span>
+                  <div className="flex flex-col gap-1">
                     <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{m.who}</span>
-                    <div className="px-2.5 py-1.5 font-roboto text-[12px]" style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: 3 }}>{m.text}</div>
+                    <div className="px-3 py-1.5 font-roboto text-[12px]" style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: 4 }}>{m.text}</div>
                   </div>
                 </div>
             )}
@@ -1019,7 +1016,7 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
           <form onSubmit={e => { e.preventDefault(); if (chat.trim()) { send({ type: 'SEND_CHAT', value: chat.trim() }); setChat('') } }} style={{ borderTop: '1px solid var(--border)' }}>
             <div className="p-2">
               <div className="inputgroup">
-                <span className="font-mono text-[12px]" style={{ color: 'var(--color-green)' }}>›</span>
+                <span className="font-mono text-[12px]" style={{ color: 'var(--color-primary)' }}>›</span>
                 <input value={chat} onChange={e => setChat(e.target.value)} placeholder="message..." className="flex-1 bg-transparent outline-none font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }} />
                 <button type="submit" className="micro">SEND</button>
               </div>
@@ -1029,44 +1026,54 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
       )}
 
       {s.leftTab === 'wiki' && (
-        <div className="flex-1 overflow-auto px-3 py-2 flex flex-col gap-1.5">
-          {docs.map(d => (
-            <button key={d[0]} className="text-left flex items-center gap-2 px-2.5 py-2 border-l-2 bg-transparent cursor-pointer" style={{ borderLeftColor: 'color-mix(in oklab, var(--accent-secondary) 50%, transparent)', background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)' }}>
-              <span className="flex-1 flex flex-col gap-0.5">
-                <span className="font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }}>{d[0]}</span>
-                <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{d[1]}</span>
-              </span>
-              <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>↗</span>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 shrink-0">
+            <span className="w-1 h-3 shrink-0" style={{ background: 'var(--accent-secondary)', boxShadow: '0 0 8px color-mix(in oklab, var(--accent-secondary) 60%, transparent)' }} />
+            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>CURATED DOCS · context7</span>
+            <span className="flex-1" />
+            <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{docs.length}</span>
+          </div>
+          <div className="flex-1 overflow-auto px-3 py-2 flex flex-col gap-1.5">
+            {docs.map((d, i) => (
+              <button key={d[0]} className="group text-left flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}>
+                <span className="font-orbitron text-[13px] shrink-0" style={{ color: 'color-mix(in oklab, var(--accent-secondary) 80%, transparent)' }}>{String(i + 1).padStart(2, '0')}</span>
+                <span className="flex-1 flex flex-col gap-1 min-w-0">
+                  <span className="font-roboto text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{d[0]}</span>
+                  <span className="font-mono text-[9px] px-1.5 py-0.5 self-start" style={{ color: 'var(--text-muted)', background: 'color-mix(in oklab, var(--accent-secondary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--accent-secondary) 28%, transparent)' }}>{d[1]}</span>
+                </span>
+                <span className="font-mono text-[12px] transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--accent-secondary)' }}>↗</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {s.leftTab === 'ai' && (
         <>
+          <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 shrink-0">
+            <span className="w-1 h-3 shrink-0" style={{ background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 60%, transparent)' }} />
+            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>NIVIX · ASSISTANT</span>
+            <span className="flex-1" />
+            <EnergyGauge value={s.energy} />
+          </div>
           <div className="flex-1 overflow-auto px-3 py-2 flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <EnergyGauge value={s.energy} big />
-              <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>+1 / {RECHARGE_SEC}s</span>
-            </div>
-
             {s.wiki.length === 0 && (
               <>
-                <p className="font-roboto text-[12px] leading-5" style={{ color: 'var(--text-muted)' }}>Ask about headers, status codes, base64, JSON. Each answer costs {COST_AI} charges. Recharges +1 every {RECHARGE_SEC}s.</p>
+                <p className="font-roboto text-[12px] leading-5" style={{ color: 'var(--text-muted)' }}>Ask about headers, status codes, base64, JSON. Each answer costs {COST_AI} charges · +1 every {RECHARGE_SEC}s.</p>
                 <div className="flex flex-wrap gap-1.5">
                   {['401 + WWW-Authenticate', 'base64 decode', 'JSON body', '404 routing'].map(q => (
-                    <button key={q} onClick={() => setAsk(q)} className="font-mono text-[9px] px-2 py-1 border bg-transparent cursor-pointer" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>{q}</button>
+                    <button key={q} onClick={() => setAsk(q)} className="font-mono text-[9px] px-2.5 py-1 cursor-pointer transition-colors" style={{ border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)', background: 'color-mix(in oklab, var(--color-primary) 6%, transparent)', color: 'var(--color-primary)', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)' }}>{q}</button>
                   ))}
                 </div>
               </>
             )}
 
             {s.wiki.map((w, i) => (
-              <div key={i} className="flex flex-col gap-1">
-                <div className="self-end max-w-[90%] px-2.5 py-1.5 font-roboto text-[11px]" style={{ background: 'color-mix(in oklab, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 28%, transparent)', color: 'var(--text-secondary)', borderRadius: 3 }}>{w.q}</div>
-                <div className="flex gap-1.5">
-                  <span className="w-5 h-5 flex items-center justify-center font-mono text-[9px] shrink-0" style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', color: 'var(--color-primary)' }}>N</span>
-                  <div className={cn(PROSE, 'text-[11px] leading-5 flex-1 px-2.5 py-1.5')} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 3 }} dangerouslySetInnerHTML={{ __html: w.a }} />
+              <div key={i} className="flex flex-col gap-1.5">
+                <div className="self-end max-w-[90%] px-3 py-1.5 font-roboto text-[11px]" style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--color-primary) 20%, transparent), color-mix(in oklab, var(--color-primary) 8%, transparent))', border: '1px solid color-mix(in oklab, var(--color-primary) 32%, transparent)', color: 'var(--text-secondary)', borderRadius: 4 }}>{w.q}</div>
+                <div className="flex gap-2">
+                  <span className="w-6 h-6 flex items-center justify-center font-orbitron text-[10px] shrink-0" style={{ background: 'color-mix(in oklab, var(--surface-raised) 90%, black)', border: '1px solid color-mix(in oklab, var(--color-primary) 45%, transparent)', color: 'var(--color-primary)' }}>N</span>
+                  <div className={cn(PROSE, 'text-[11px] leading-5 flex-1 px-3 py-2')} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 4, borderLeft: '2px solid color-mix(in oklab, var(--color-primary) 55%, transparent)' }} dangerouslySetInnerHTML={{ __html: w.a }} />
                 </div>
               </div>
             ))}
