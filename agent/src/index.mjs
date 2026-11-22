@@ -223,7 +223,7 @@ function serveStatic(req, res) {
     'content-type': type,
     'content-length': size,
     'accept-ranges': 'bytes',
-    'cache-control': ext === '.html' ? 'no-store' : 'public, max-age=3600',
+    'cache-control': (ext === '.html' || ext === '.js' || ext === '.css') ? 'no-store' : 'public, max-age=300',
   })
   createReadStream(file).pipe(res)
 }

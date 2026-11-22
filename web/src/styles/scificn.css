@@ -341,3 +341,8 @@
   }
   .lobby-video { animation: none !important; opacity: 0.55; }
 }
+
+/* IDE editor: faint selection over the transparent textarea */
+.ide-editor::selection { background: rgba(38,79,120,0.55); color: transparent; }
+.ide-editor::-moz-selection { background: rgba(38,79,120,0.55); color: transparent; }
+

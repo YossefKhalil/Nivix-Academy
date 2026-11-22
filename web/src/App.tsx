@@ -335,12 +335,20 @@ function MuteButton() {
 type ScoreRow = { id: string; name: string; lang: 'python' | 'csharp'; score?: number | null; host?: boolean; connected?: boolean; me?: boolean }
 
 function ScoreCard({ row, you, total }: { row: ScoreRow; you?: boolean; total: number }) {
+  const pct = Math.max(0, Math.min(1, (row.score ?? 0) / Math.max(1, total)))
+  const tone = you ? 'var(--color-primary)' : 'var(--color-accent)'
   return (
-    <span className="flex items-center gap-2 px-2 py-1 border min-w-0" style={{ borderColor: you ? 'color-mix(in oklab, var(--color-primary) 45%, transparent)' : 'var(--border)', background: 'color-mix(in oklab, var(--surface-raised) 70%, transparent)' }}>
-      <span className="font-orbitron text-[11px] tracking-[0.08em] truncate" style={{ color: you ? 'var(--color-primary)' : 'var(--text-secondary)' }}>{row.name}</span>
-      <LangIcon lang={row.lang} size={12} />
-      <span className="font-mono text-[10px]" style={{ color: 'var(--color-primary)' }}>{row.score ?? '—'}<span style={{ color: 'var(--text-muted)' }}>/{total}</span></span>
-      {row.connected === false && <span className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>OFF</span>}
+    <span className="flex flex-col justify-center gap-1 px-2.5 py-1 border min-w-[118px] max-w-[190px]" style={{ borderColor: you ? 'color-mix(in oklab, var(--color-primary) 45%, transparent)' : 'var(--border)', background: 'color-mix(in oklab, var(--surface-raised) 70%, transparent)' }}>
+      <span className="flex items-center gap-2 min-w-0">
+        <span className="font-orbitron text-[11px] tracking-[0.08em] truncate" style={{ color: you ? 'var(--color-primary)' : 'var(--text-secondary)' }}>{row.name}</span>
+        <LangIcon lang={row.lang} size={12} />
+        <span className="flex-1" />
+        <span className="font-mono text-[10px]" style={{ color: tone }}>{row.score ?? '—'}<span style={{ color: 'var(--text-muted)' }}>/{total}</span></span>
+        {row.connected === false && <span className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>OFF</span>}
+      </span>
+      <span className="relative block h-[3px] overflow-hidden" style={{ background: 'color-mix(in oklab, var(--border) 80%, transparent)' }}>
+        <i className="absolute inset-y-0 left-0 block transition-all duration-500" style={{ width: `${pct * 100}%`, background: tone, boxShadow: `0 0 8px ${tone}` }} />
+      </span>
     </span>
   )
 }
@@ -403,12 +411,12 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
 
       {/* centre — VS (own column, so it stays centred) */}
       <span
-        className="grid place-items-center w-[36px] h-[26px] font-orbitron font-bold text-[10px] tracking-[0.16em]"
+        className="grid place-items-center w-[40px] h-[28px] font-orbitron font-bold text-[11px] tracking-[0.16em]"
         style={{
           color: 'var(--color-primary)',
-          background: 'color-mix(in oklab, var(--color-primary) 10%, transparent)',
-          boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 38%, transparent)',
-          clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
+          background: 'linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 22%, transparent), color-mix(in oklab, var(--color-primary) 6%, transparent))',
+          boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 45%, transparent), 0 0 14px color-mix(in oklab, var(--color-primary) 18%, transparent)',
+          clipPath: 'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
         }}
       >
         VS
@@ -804,7 +812,22 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
             setReady(true)
             try {
               const f = e.target.getIframe()
-              if (f) { f.style.position = 'absolute'; f.style.top = '-9%'; f.style.left = '-4%'; f.style.width = '108%'; f.style.height = '118%'; f.style.pointerEvents = 'none' }
+              if (f) {
+                const style = () => {
+                  f.style.setProperty('position', 'absolute', 'important')
+                  f.style.setProperty('top', '0', 'important')
+                  f.style.setProperty('left', '0', 'important')
+                  f.style.setProperty('width', '100%', 'important')
+                  f.style.setProperty('height', '100%', 'important')
+                  f.style.setProperty('transform', 'scale(1.55)', 'important')
+                  f.style.setProperty('transform-origin', 'center center', 'important')
+                  f.style.setProperty('pointer-events', 'none', 'important')
+                }
+                style()
+                // YouTube re-applies its own styles on resize; keep ours pinned.
+                const guard = window.setInterval(style, 500)
+                window.setTimeout(() => window.clearInterval(guard), 20000)
+              }
             } catch { /* ignore */ }
             e.target.seekTo(video.start, true)
           },
@@ -1061,6 +1084,100 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
 }
 
 /* ── match: workspace ──────────────────────────────── */
+
+/* ── IDE editor (VS Code Dark+ colours) ────────────── */
+
+const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+const PY_CTRL = new Set(['if', 'elif', 'else', 'for', 'while', 'return', 'try', 'except', 'finally', 'with', 'break', 'continue'])
+const PY_KW = new Set(['def', 'class', 'import', 'from', 'as', 'pass', 'global', 'nonlocal', 'assert', 'del', 'raise', 'lambda', 'yield', 'await', 'async', 'in', 'is', 'not', 'and', 'or', 'True', 'False', 'None'])
+const CS_CTRL = new Set(['if', 'else', 'for', 'foreach', 'while', 'do', 'switch', 'case', 'default', 'break', 'continue', 'return', 'try', 'catch', 'finally', 'throw'])
+const CS_KW = new Set(['using', 'namespace', 'class', 'struct', 'interface', 'enum', 'static', 'public', 'private', 'protected', 'internal', 'void', 'var', 'new', 'const', 'readonly', 'async', 'await', 'in', 'is', 'not', 'true', 'false', 'null', 'this', 'base', 'override', 'virtual', 'abstract', 'sealed'])
+const CS_TYPE = new Set(['int', 'string', 'bool', 'double', 'float', 'long', 'byte', 'char', 'object', 'Task', 'List', 'Dictionary', 'Console', 'HttpListener', 'HttpClient', 'HttpListenerContext', 'Encoding', 'WebRequest', 'JsonDocument', 'JsonSerializer'])
+
+function highlight(src: string, lang: 'python' | 'csharp'): string {
+  const out: string[] = []
+  const push = (color: string, text: string) => out.push(`<span style="color:${color}">${escapeHtml(text)}</span>`)
+  let i = 0
+  while (i < src.length) {
+    const rest = src.slice(i)
+    if (lang === 'python' && rest[0] === '#') {
+      const nl = rest.indexOf('\n'); const tok = nl < 0 ? rest : rest.slice(0, nl)
+      push('#6A9955', tok); i += tok.length; continue
+    }
+    if (lang === 'csharp' && rest.startsWith('//')) {
+      const nl = rest.indexOf('\n'); const tok = nl < 0 ? rest : rest.slice(0, nl)
+      push('#6A9955', tok); i += tok.length; continue
+    }
+    if (rest[0] === '"' || rest[0] === "'") {
+      const quote = (lang === 'python' && (rest.startsWith('"""') || rest.startsWith("'''"))) ? rest.slice(0, 3) : rest[0]
+      let j = quote.length
+      while (j < rest.length) {
+        if (rest[j] === '\\') { j += 2; continue }
+        if (rest.slice(j, j + quote.length) === quote) { j += quote.length; break }
+        j++
+      }
+      const tok = rest.slice(0, j)
+      push('#CE9178', tok); i += tok.length; continue
+    }
+    const num = /^\d+(\.\d+)?/.exec(rest)
+    if (num) { push('#B5CEA8', num[0]); i += num[0].length; continue }
+    const id = /^[A-Za-z_]\w*/.exec(rest)
+    if (id) {
+      const word = id[0]
+      const after = rest.slice(word.length)
+      if (lang === 'python') {
+        if (PY_CTRL.has(word)) push('#C586C0', word)
+        else if (PY_KW.has(word) || word === 'self') push('#569CD6', word)
+        else if (/^\s*\(/.test(after)) push('#DCDCAA', word)
+        else if (/^[A-Z]/.test(word)) push('#4EC9B0', word)
+        else push('#9CDCFE', word)
+      } else {
+        if (CS_CTRL.has(word)) push('#C586C0', word)
+        else if (CS_KW.has(word) || CS_TYPE.has(word)) push('#569CD6', word)
+        else if (/^[A-Z]/.test(word)) push('#4EC9B0', word)
+        else if (/^\s*\(/.test(after)) push('#DCDCAA', word)
+        else push('#9CDCFE', word)
+      }
+      i += word.length; continue
+    }
+    push('#D4D4D4', rest[0]); i++
+  }
+  return out.join('')
+}
+
+function CodeEditor({ value, onChange, onBlur, lang }: { value: string; onChange: (v: string) => void; onBlur: () => void; lang: 'python' | 'csharp' }) {
+  const taRef = useRef<HTMLTextAreaElement | null>(null)
+  const preRef = useRef<HTMLPreElement | null>(null)
+  const sync = () => {
+    if (taRef.current && preRef.current) {
+      preRef.current.scrollTop = taRef.current.scrollTop
+      preRef.current.scrollLeft = taRef.current.scrollLeft
+    }
+  }
+  return (
+    <div className="relative flex-1 min-h-0" style={{ background: '#1e1e1e' }}>
+      <pre
+        ref={preRef}
+        aria-hidden
+        className="absolute inset-0 m-0 overflow-auto px-4 py-3 font-mono text-[13px] leading-[1.65] pointer-events-none"
+        style={{ color: '#D4D4D4', whiteSpace: 'pre', tabSize: 4 }}
+        dangerouslySetInnerHTML={{ __html: highlight(value, lang) + '\n' }}
+      />
+      <textarea
+        ref={taRef}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onBlur={onBlur}
+        onScroll={sync}
+        spellCheck={false}
+        wrap="off"
+        className="ide-editor absolute inset-0 w-full h-full resize-none outline-none px-4 py-3 font-mono text-[13px] leading-[1.65]"
+        style={{ color: 'transparent', caretColor: '#AEAFAD', background: 'transparent', whiteSpace: 'pre', tabSize: 4, border: 0 }}
+      />
+    </div>
+  )
+}
 
 function Workspace({ s, send }: { s: State; send: Send }) {
   const [code, setCode] = useState<string | null>(null)
