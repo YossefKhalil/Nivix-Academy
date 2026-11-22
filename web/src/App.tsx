@@ -354,10 +354,11 @@ function MuteButton() {
   )
 }
 
-type ScoreRow = { id: string; name: string; lang: 'python' | 'csharp'; score?: number | null; host?: boolean; connected?: boolean; me?: boolean }
+type ScoreRow = { id: string; name: string; lang: 'python' | 'csharp'; score?: number | null; stage?: number; host?: boolean; connected?: boolean; me?: boolean }
 
 function ScoreCard({ row, you, total }: { row: ScoreRow; you?: boolean; total: number }) {
-  const stage = row.score == null ? 0 : Math.max(0, Math.min(4, Math.ceil((row.score / Math.max(1, total)) * 4)))
+  const derived = row.score == null ? 0 : Math.max(0, Math.min(4, Math.ceil((row.score / Math.max(1, total)) * 4)))
+  const stage = row.stage != null ? Math.max(0, Math.min(4, row.stage)) : derived
   const tone = 'var(--color-primary)'
   return (
     <span
@@ -421,6 +422,7 @@ function ScoreDropdown({ roster }: { roster: ScoreRow[] }) {
 function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; roster: ScoreRow[] }) {
   const total = ROUNDS[s.round - 1].tests.length
   const me = roster.find(p => p.me) || roster[0] || { id: 'me', name: s.me.name || 'YOU', lang: s.me.lang, score: s.me.score, me: true }
+  const meRow = { ...me, score: s.me.score ?? me.score, stage: s.me.stage }
   const others = roster.filter(p => p.id !== me.id)
   const opponent = others[0]
   const extra = others.length - 1
@@ -442,7 +444,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
           <span className="font-orbitron text-[11px] tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>ROUND {s.round}<span style={{ color: 'var(--text-muted)' }}>/{s.totalRounds}</span></span>
         </div>
-        <ScoreCard row={me} you total={total} />
+        <ScoreCard row={meRow} you total={total} />
       </div>
 
       {/* centre - VS (own column, so it stays centred) */}
@@ -1610,8 +1612,8 @@ export default function App() {
   const roster: ScoreRow[] = live.room?.members?.length
     ? live.room.members.map(m => ({ id: m.id, name: m.name, lang: m.lang, score: m.score ?? null, host: m.host, connected: m.connected, me: m.id === meId }))
     : [
-        { id: 'me', name: s.me.name || 'YOU', lang: s.me.lang, score: s.me.score, host: true, connected: true, me: true },
-        ...(s.opp.joined ? [{ id: 'opp', name: s.opp.name, lang: s.opp.lang, score: s.opp.score, host: false, connected: s.opp.connected, me: false }] : []),
+        { id: 'me', name: s.me.name || 'YOU', lang: s.me.lang, score: s.me.score, stage: s.me.stage, host: true, connected: true, me: true },
+        ...(s.opp.joined ? [{ id: 'opp', name: s.opp.name, lang: s.opp.lang, score: s.opp.score, stage: s.opp.stage, host: false, connected: s.opp.connected, me: false }] : []),
       ]
   useSoundReactions(s, sfx)
   useGlobalSfx(sfx)
@@ -1632,16 +1634,11 @@ export default function App() {
         <Backdrop />
 
         <div className="relative z-10 flex-1 min-h-0 flex flex-col">
-          {s.screen === 'boot' && <Boot s={s} send={send} />}
           {s.screen === 'lobby' && <Lobby s={s} send={send} agent={agent} onSettings={() => setSettingsOpen(true)} live={live} />}
           {s.screen === 'match' && <Match s={s} send={send} onSettings={() => setSettingsOpen(true)} roster={roster} />}
           {s.screen === 'matchResult' && <Final s={s} send={send} />}
           {s.screen === 'countdown' && <Countdown s={s} />}
           {s.screen === 'roundResult' && <RoundResult s={s} send={send} />}
-
-          <div className="flex-none h-[24px] flex items-center px-3 font-mono text-[9px] tracking-[0.08em]" style={{ color: 'var(--color-amber)', borderTop: '1px dashed color-mix(in oklab, var(--color-amber) 30%, transparent)', background: 'rgba(20,14,4,0.5)' }}>
-            NIVIX ACADEMY · LOCAL AGENT
-          </div>
         </div>
 
         <ScreenFade screen={s.screen} />

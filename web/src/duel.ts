@@ -49,7 +49,7 @@ export type Action = { type: string; value?: string; results?: { name: string; p
 
 export function initial(): State {
   return {
-    screen: 'boot', bootLine: 0,
+    screen: 'lobby', bootLine: 0,
     me: { name: 'NOVA', lang: 'python', ready: false, submitted: false, score: null, stage: 0 },
     opp: { name: 'KAI', lang: 'csharp', ready: false, submitted: false, score: null, stage: 0, joined: false, connected: true },
     role: null, lobbyTab: 'host', room: { code: '7F3K', link: 'http://100.101.102.103:4318/7F3K' },
