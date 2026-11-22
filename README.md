@@ -58,6 +58,10 @@ node src/index.mjs [--port 7788] [--workspace DIR] [--ui DIR] [--open]
 | `POST /api/room` | `{ mode: "single" \| "multi", network?, maxPlayers? }` — host a room |
 | `POST /api/join` | `{ network?, host, port, code, name, lang }` — join over libzt/LAN |
 | `POST /api/leave` | tear the room down |
+| `GET /api/zt` | ZeroTier token/network status |
+| `POST /api/zt/token` | `{ token }` — validate + store a Central API token |
+| `POST /api/zt/network` | `{ name, public }` — create a network with the stored token |
+| `POST /api/zt/authorize` | `{ memberId }` — authorize a member on the stored network |
 | `GET /api/logs` | recent server output |
 
 ### WebSockets

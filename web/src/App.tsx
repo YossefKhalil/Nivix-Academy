@@ -12,6 +12,7 @@ import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
 import { getAgentStatus, openInEditor, type AgentStatus } from './agent'
+import { useLiveRoom, createRoom, joinRoom, leaveRoom, getZt, setZtToken, createZtNetwork, type RoomMember } from './room'
 
 type Send = (a: Action) => void
 const borderA = (c: string) => `color-mix(in oklab, ${c} 50%, transparent)`
@@ -516,6 +517,98 @@ function Lobby({ s, send, agent, onSettings }: { s: State; send: Send; agent: Ag
     )
   }
 
+  const live = useLiveRoom()
+  const [mode, setMode] = useState<'single' | 'multi'>('single')
+  const [maxPlayers, setMaxPlayers] = useState(4)
+  const [zt, setZt] = useState<{ tokenSet: boolean; network: string | null } | null>(null)
+  const [token, setToken] = useState('')
+  const [joinNet, setJoinNet] = useState('')
+  const [joinHost, setJoinHost] = useState('')
+  const [joinCode, setJoinCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+
+  useEffect(() => { if (agent) getZt().then(z => { if (z) setZt(z) }) }, [agent])
+
+  useEffect(() => {
+    if (!live.connected) return
+    let id = ''
+    try {
+      id = localStorage.getItem('duel.playerId') || ''
+      if (!id) { id = 'p' + Date.now().toString(36); localStorage.setItem('duel.playerId', id) }
+    } catch { id = 'p' + Date.now().toString(36) }
+    live.send({ t: 'join', id, name: s.me.name || 'PLAYER', lang: s.me.lang })
+  }, [live.connected, s.me.name, s.me.lang, live.room?.code]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const room = live.room
+  const members = room?.members || []
+  const inRoom = !!room?.code || !!s.role
+  const isHost = room ? room.role === 'host' : s.role === 'host'
+  const canStart = (room?.mode || 'single') === 'single' ? members.length >= 1 : members.length >= 2
+
+  const doCreate = async () => {
+    setNote(null)
+    if (!agent || !live.connected) { send({ type: 'CREATE_ROOM' }); return }
+    setBusy(true)
+    const r = await createRoom({ mode, maxPlayers, network: mode === 'multi' ? 'auto' : undefined })
+    setBusy(false)
+    if (!r?.ok) { setNote(r?.error || 'could not create room'); return }
+    send({ type: 'CREATE_ROOM' })
+    if (r.room?.network) setZt(z => ({ tokenSet: !!z?.tokenSet, network: r.room.network }))
+    else if (mode === 'multi') setNote('no ZeroTier network — peers can use your LAN address')
+  }
+
+  const doJoin = async () => {
+    setNote(null)
+    if (!agent || !live.connected) { send({ type: 'JOIN_ROOM' }); return }
+    setBusy(true)
+    const r = await joinRoom({ network: joinNet || zt?.network || undefined, host: joinHost, code: joinCode, name: s.me.name, lang: s.me.lang })
+    setBusy(false)
+    if (!r?.ok) { setNote(r?.error || 'could not join'); return }
+    send({ type: 'JOIN_ROOM' })
+  }
+
+  const doLeave = async () => { await leaveRoom(); send({ type: 'LEAVE' }) }
+
+  const saveToken = async () => {
+    if (!token.trim()) return
+    const r = await setZtToken(token.trim())
+    if (r?.ok) { setToken(''); setZt(await getZt()); setNote('token saved') }
+    else setNote(r?.error || 'token rejected')
+  }
+
+  const makeNetwork = async () => {
+    const r = await createZtNetwork({ name: 'Nivix Academy', public: true })
+    if (r?.ok) { setZt(await getZt()); setNote('network ' + (r.network?.id || 'created')) }
+    else setNote(r?.error || 'could not create network')
+  }
+
+  const modeBtn = (m: 'single' | 'multi', label: string, sub: string) => (
+    <button
+      onClick={() => setMode(m)}
+      className="flex-1 text-left px-3 py-2 cursor-pointer"
+      style={{
+        border: '1px solid ' + (mode === m ? 'var(--color-primary)' : 'var(--border)'),
+        background: mode === m ? 'color-mix(in oklab, var(--color-primary) 10%, transparent)' : 'transparent',
+        color: mode === m ? 'var(--color-primary)' : 'var(--text-secondary)',
+      }}
+    >
+      <div className="font-mono text-[10px] tracking-[0.12em]">{label}</div>
+      <div className="font-mono text-[8px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{sub}</div>
+    </button>
+  )
+
+  const memberCard = (m: RoomMember) => (
+    <div key={m.id} className="flex items-center gap-2 px-3 py-2" style={{ border: '1px solid var(--border)', background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)' }}>
+      <span className="font-orbitron text-[13px] tracking-[0.08em]">{m.name}</span>
+      <LangIcon lang={m.lang} size={12} />
+      {m.host && <Chip>HOST</Chip>}
+      <span className="flex-1" />
+      {!m.connected && <span className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>OFFLINE</span>}
+      <ReadyMark ready={m.ready} />
+    </div>
+  )
+
   return (
     <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
       <LobbyBackdrop />
@@ -567,49 +660,105 @@ function Lobby({ s, send, agent, onSettings }: { s: State; send: Send; agent: Ag
             </div>
           </GameCard>
 
-          {!s.role ? (
-            <div className="grid grid-cols-2 gap-4">
-              <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
-                <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>HOST MATCH</span>
-                <p className="font-roboto text-[13px] leading-6" style={{ color: 'var(--text-muted)' }}>Create a room and share the code or join link.</p>
-                <div className="mt-auto"><Button shape="flat" className="!mb-0 !px-5 !py-1.5" onClick={() => send({ type: 'CREATE_ROOM' })}>CREATE ROOM</Button></div>
-              </GameCard>
-              <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
-                <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>JOIN MATCH</span>
-                <p className="font-roboto text-[13px] leading-6" style={{ color: 'var(--text-muted)' }}>Enter a room code (same LAN) or paste a join link.</p>
-                <input placeholder="7F3K" className="font-mono tracking-[0.16em] uppercase px-3 py-2 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
-                <div className="mt-auto"><Button shape="flat" variant="secondary" className="!mb-0 !px-5 !py-1.5" onClick={() => send({ type: 'JOIN_ROOM' })}>JOIN ROOM</Button></div>
-              </GameCard>
-            </div>
+          {!inRoom ? (
+            <>
+              <div className="flex gap-2">
+                {modeBtn('single', 'SINGLE PLAYER', 'solo · judge your own code')}
+                {modeBtn('multi', 'MULTIPLAYER', 'host a room · N players')}
+              </div>
+
+              {mode === 'multi' && (
+                <div className="flex flex-wrap items-center gap-2 px-3 py-2" style={{ border: '1px solid var(--border)', background: 'color-mix(in oklab, var(--surface-raised) 45%, transparent)' }}>
+                  <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>ZEROTIER</span>
+                  <span className="font-mono text-[11px]" style={{ color: zt?.network ? 'var(--color-primary)' : 'var(--text-muted)' }}>{zt?.network || 'no network'}</span>
+                  <span className="flex-1" />
+                  <input
+                    value={token} onChange={e => setToken(e.target.value)} placeholder="central API token" type="password"
+                    className="font-mono text-[10px] px-2 py-1 border bg-transparent outline-none w-[180px]"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+                  />
+                  <button onClick={saveToken} className="micro">SAVE TOKEN</button>
+                  <button onClick={makeNetwork} className="micro">CREATE NETWORK</button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
+                  <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>{mode === 'multi' ? 'HOST ROOM' : 'SOLO SESSION'}</span>
+                  <p className="font-roboto text-[13px] leading-6" style={{ color: 'var(--text-muted)' }}>{mode === 'multi' ? 'Create a room, then share the network + code.' : 'Start a solo session and keep your own score.'}</p>
+                  {mode === 'multi' && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-[9px] tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>MAX</span>
+                      {[2, 4, 8].map(n => (
+                        <button key={n} onClick={() => setMaxPlayers(n)} className="micro" style={{ color: maxPlayers === n ? 'var(--color-primary)' : undefined }}>{n}</button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-auto">
+                    <Button shape="flat" className="!mb-0 !px-5 !py-1.5" disabled={busy} onClick={doCreate}>{busy ? 'WORKING…' : mode === 'multi' ? 'CREATE ROOM' : 'START SOLO'}</Button>
+                  </div>
+                </GameCard>
+
+                {mode === 'multi' ? (
+                  <GameCard bodyClassName="p-5 flex flex-col gap-2 h-full">
+                    <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>JOIN ROOM</span>
+                    <input value={joinNet} onChange={e => setJoinNet(e.target.value)} placeholder="network id" className="font-mono text-[11px] px-3 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
+                    <input value={joinHost} onChange={e => setJoinHost(e.target.value)} placeholder="host zero tier address" className="font-mono text-[11px] px-3 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
+                    <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="room code" className="font-mono text-[11px] tracking-[0.16em] uppercase px-3 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
+                    <div className="mt-auto">
+                      <Button shape="flat" variant="secondary" className="!mb-0 !px-5 !py-1.5" disabled={busy || !joinHost || !joinCode} onClick={doJoin}>JOIN ROOM</Button>
+                    </div>
+                  </GameCard>
+                ) : (
+                  <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
+                    <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>HOW IT WORKS</span>
+                    <p className="font-roboto text-[13px] leading-6" style={{ color: 'var(--text-muted)' }}>Write an HTTP server, run the judge, and submit before the clock runs out. Energy buys hints and NIVIX AI answers.</p>
+                  </GameCard>
+                )}
+              </div>
+
+              {note && <div className="text-center font-mono text-[9px]" style={{ color: 'var(--color-amber)' }}>{note}</div>}
+            </>
           ) : (
             <>
               <GameCard bodyClassName="p-4 grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 items-center">
                 <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>ROOM</span>
-                <span className="font-orbitron text-[26px] tracking-[0.24em] text-primary">{s.room.code}</span>
-                <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>LINK</span>
-                <span className="font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>{s.room.link}</span>
+                <span className="font-orbitron text-[26px] tracking-[0.24em] text-primary">{room?.code || s.room.code}</span>
+                <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>MODE</span>
+                <span className="font-mono text-[12px]" style={{ color: 'var(--text-secondary)' }}>{(room?.mode || 'single').toUpperCase()} · {members.length}/{room?.maxPlayers || 2}</span>
+                {room?.network && <>
+                  <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>NETWORK</span>
+                  <span className="font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>{room.network}</span>
+                </>}
+                {room?.address && <>
+                  <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>ADDRESS</span>
+                  <span className="font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>{room.address}</span>
+                </>}
               </GameCard>
 
-              <div className="flex items-center gap-4">
-                <GameCard className="flex-1" bodyClassName="flex items-center gap-3 p-4">
-                  <span className="font-orbitron text-[15px] tracking-[0.1em]">{s.me.name || 'NOVA'}</span>
-                  <LangIcon lang={s.me.lang} size={13} />
-                  <ReadyMark ready={s.me.ready} />
-                  <span className="flex-1" />
-                  <Button shape="flat" className="!mb-0 !px-5 !py-1.5" onClick={() => send({ type: 'TOGGLE_READY' })}>{s.me.ready ? 'UNREADY' : 'READY'}</Button>
-                </GameCard>
-                <span className="font-orbitron text-[10px]" style={{ color: 'var(--text-muted)' }}>VS</span>
-                <GameCard className="flex-1" bodyClassName="flex items-center gap-3 p-4">
-                  <span className="font-orbitron text-[15px] tracking-[0.1em]" style={{ color: s.opp.joined ? undefined : 'var(--text-muted)' }}>{s.opp.joined ? s.opp.name : 'WAITING…'}</span>
-                  {s.opp.joined && <LangIcon lang={s.opp.lang} size={13} />}
-                  {s.opp.joined && <ReadyMark ready={s.opp.ready} opponent />}
-                </GameCard>
+              <div className="flex flex-col gap-2">
+                {members.length > 0 ? members.map(memberCard) : (
+                  <div className="flex items-center gap-4">
+                    <GameCard className="flex-1" bodyClassName="flex items-center gap-3 p-4">
+                      <span className="font-orbitron text-[15px] tracking-[0.1em]">{s.me.name || 'NOVA'}</span>
+                      <LangIcon lang={s.me.lang} size={13} />
+                      <ReadyMark ready={s.me.ready} />
+                    </GameCard>
+                    <span className="font-orbitron text-[10px]" style={{ color: 'var(--text-muted)' }}>VS</span>
+                    <GameCard className="flex-1" bodyClassName="flex items-center gap-3 p-4">
+                      <span className="font-orbitron text-[15px] tracking-[0.1em]" style={{ color: s.opp.joined ? undefined : 'var(--text-muted)' }}>{s.opp.joined ? s.opp.name : 'WAITING...'}</span>
+                      {s.opp.joined && <LangIcon lang={s.opp.lang} size={13} />}
+                      {s.opp.joined && <ReadyMark ready={s.opp.ready} opponent />}
+                    </GameCard>
+                  </div>
+                )}
               </div>
 
-              <div className="flex justify-center">
-                {s.role === 'host'
-                  ? <Button shape="flat" className="!mb-0 !px-5 !py-1.5" disabled={!(s.me.ready && s.opp.ready)} onClick={() => send({ type: 'START' })}>START MATCH</Button>
+              <div className="flex justify-center items-center gap-2">
+                {isHost
+                  ? <Button shape="flat" className="!mb-0 !px-5 !py-1.5" disabled={!canStart || busy} onClick={() => send({ type: 'START' })}>{canStart ? 'START MATCH' : 'WAITING FOR PLAYERS'}</Button>
                   : <span className="font-mono text-[10px] tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>WAITING FOR HOST TO START</span>}
+                <button onClick={doLeave} className="micro">LEAVE</button>
               </div>
             </>
           )}

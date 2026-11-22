@@ -227,6 +227,7 @@ export function reduce(s0: State, a: Action): State {
     case 'TOGGLE_READY': s.me.ready = !s.me.ready; sys(s.chat, 'YOU ' + (s.me.ready ? 'READY' : 'STOOD DOWN')); break
     case 'OPP_READY': s.opp.ready = true; sys(s.chat, s.opp.name + ' READY'); break
     case 'START': s.screen = 'countdown'; s.countdown = 3; break
+    case 'LEAVE': s.role = null; s.screen = 'lobby'; break
     case 'COUNT': s.countdown = Math.max(0, s.countdown - 1); break
     case 'MATCH_BEGIN': startRound(s); break
     case 'TICK': tick(s); break

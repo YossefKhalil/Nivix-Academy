@@ -23,6 +23,8 @@ import { ServerRunner } from './runner.mjs'
 import { runRound } from './judge.mjs'
 import { Room } from './room.mjs'
 import { libztAvailable } from './transport.mjs'
+import { ztApi } from './zerotier-api.mjs'
+import { createConfig } from './config.mjs'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const AGENT_ROOT = resolvePath(here, '..')
@@ -105,6 +107,8 @@ const state = { startedAt: Date.now(), logs: [] }
 const PEER_PORT = Number(opt('peer-port', 7789))
 let libztReady = false
 libztAvailable().then(v => { libztReady = v })
+
+const config = createConfig(AGENT_ROOT)
 
 const room = new Room({
   stateDir: join(AGENT_ROOT, '.zt'),
@@ -222,6 +226,18 @@ const wss = new WebSocketServer({ noServer: true })
 
 /* ── http ───────────────────────────────────────────── */
 
+async function resolveNetwork(requested) {
+  const cfg = config.read()
+  if (requested && requested !== 'auto' && requested !== 'new') return requested
+  if (requested !== 'new' && cfg.ztNetwork) return cfg.ztNetwork
+  if (cfg.ztToken) {
+    const net = await ztApi.createNetwork(cfg.ztToken, { name: 'Nivix Academy', public: true })
+    config.write({ ztNetwork: net.id, ztNetworkName: net.config?.name || 'Nivix Academy' })
+    return net.id
+  }
+  return null
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://local')
 
@@ -266,7 +282,7 @@ const server = http.createServer(async (req, res) => {
         try {
           const snap = await room.createHost({
             mode: body.mode,
-            network: body.network,
+            network: body.mode === 'multi' ? await resolveNetwork(body.network) : undefined,
             maxPlayers: body.maxPlayers,
             peerPort: Number(body.peerPort) || PEER_PORT,
           })
@@ -283,7 +299,7 @@ const server = http.createServer(async (req, res) => {
         if (!host || !code) return sendJson(res, 400, { ok: false, error: 'host and code required' })
         try {
           const r = await room.joinRemote({
-            network: body.network,
+            network: body.network || config.read().ztNetwork || undefined,
             host,
             port: Number(body.port) || PEER_PORT,
             code,
@@ -298,6 +314,56 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/leave' && req.method === 'POST') {
         await room.teardown()
         return sendJson(res, 200, { ok: true, room: room.snapshot() })
+      }
+
+      if (url.pathname === '/api/zt' && req.method === 'GET') {
+        const cfg = config.read()
+        return sendJson(res, 200, {
+          ok: true,
+          tokenSet: !!cfg.ztToken,
+          network: cfg.ztNetwork || null,
+          networkName: cfg.ztNetworkName || null,
+        })
+      }
+
+      if (url.pathname === '/api/zt/token' && req.method === 'POST') {
+        const body = await readJson(req)
+        const token = String(body.token || '').trim()
+        if (!token) return sendJson(res, 400, { ok: false, error: 'token required' })
+        try {
+          const networks = await ztApi.networks(token)
+          config.write({ ztToken: token })
+          return sendJson(res, 200, { ok: true, networks: Array.isArray(networks) ? networks.length : 0 })
+        } catch (e) {
+          return sendJson(res, 401, { ok: false, error: String(e?.message || e) })
+        }
+      }
+
+      if (url.pathname === '/api/zt/network' && req.method === 'POST') {
+        const cfg = config.read()
+        if (!cfg.ztToken) return sendJson(res, 400, { ok: false, error: 'save a ZeroTier token first' })
+        const body = await readJson(req)
+        try {
+          const net = await ztApi.createNetwork(cfg.ztToken, { name: body.name || 'Nivix Academy', public: body.public !== false })
+          config.write({ ztNetwork: net.id, ztNetworkName: net.config?.name || 'Nivix Academy' })
+          return sendJson(res, 200, { ok: true, network: { id: net.id, name: net.config?.name || 'Nivix Academy' } })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
+      }
+
+      if (url.pathname === '/api/zt/authorize' && req.method === 'POST') {
+        const cfg = config.read()
+        const body = await readJson(req)
+        if (!cfg.ztToken || !cfg.ztNetwork || !body.memberId) {
+          return sendJson(res, 400, { ok: false, error: 'token, network and memberId required' })
+        }
+        try {
+          const member = await ztApi.authorize(cfg.ztToken, cfg.ztNetwork, String(body.memberId))
+          return sendJson(res, 200, { ok: true, member })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
       }
 
       return sendJson(res, 404, { ok: false, error: 'unknown endpoint' })
