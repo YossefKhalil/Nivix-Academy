@@ -87,16 +87,19 @@ const PROBES = {
 }
 
 /** Run the suite for a round (1-based index into the coding lessons). */
-export async function runRound({ round, port }) {
+export async function runRound({ round, port, suite = 'all' }) {
   const lesson = coding[(Number(round) || 1) - 1]
   if (!lesson) return []
   const probes = PROBES[lesson.id] || []
   const results = []
   for (let i = 0; i < lesson.tests.length; i++) {
+    const t = lesson.tests[i]
+    if (suite === 'visible' && t.visible === false) continue
+    if (suite === 'hidden' && t.visible !== false) continue
     const probe = probes[i]
     let pass = false
     try { pass = probe ? !!await probe(port) : false } catch { pass = false }
-    results.push({ name: lesson.tests[i].name, pass })
+    results.push({ index: i, name: t.name, pass })
   }
   return results
 }

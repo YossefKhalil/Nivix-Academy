@@ -40,12 +40,12 @@ export interface State {
   hintsOpen: boolean; energy: number; hintsPaid: boolean
   chat: Msg[]; wiki: WikiEntry[]
   ranTests: boolean; final: boolean; oppTick: number
-  testResults: { name: string; pass: boolean }[] | null
+  testResults: ({ name: string; pass: boolean } | null)[] | null
   rounds: RoundScore[]
   countdown: number; mockOpen: boolean
 }
 
-export type Action = { type: string; value?: string; results?: { name: string; pass: boolean }[]; answer?: string }
+export type Action = { type: string; value?: string; results?: { name: string; pass: boolean; index?: number }[]; answer?: string }
 
 export function initial(): State {
   return {
@@ -73,7 +73,7 @@ function startRound(s: State) {
   s.opp.submitted = false; s.opp.score = null; s.opp.stage = 0; s.oppTick = 0
   s.chat = []; sys(s.chat, 'ROUND ' + s.round + ' STARTED - ' + ROUNDS[s.round - 1].tag)
 }
-const mePass = (s: State) => s.testResults ? s.testResults.filter(t => t.pass).length : ROUNDS[s.round - 1].tests.filter(t => t.pass).length
+const mePass = (s: State) => s.testResults ? s.testResults.filter(t => t && t.pass).length : ROUNDS[s.round - 1].tests.filter(t => t.pass).length
 const oppPass = (s: State) => {
   const tot = ROUNDS[s.round - 1].tests.length
   const sc = [0, 0.4, 0.65, 0.85, 1][s.opp.stage] || 0
@@ -160,9 +160,15 @@ export function reduce(s0: State, a: Action): State {
     case 'RUN_TESTS': runTests(s); break
     case 'TESTS_RESULT': {
       s.ranTests = true
-      s.testResults = a.results || []
-      s.me.score = s.testResults.filter(t => t.pass).length
-      s.me.stage = Math.max(1, Math.min(3, 1 + Math.floor((3 * s.me.score) / Math.max(1, s.testResults.length))))
+      const total = ROUNDS[s.round - 1].tests.length
+      const arr: ({ name: string; pass: boolean } | null)[] = s.testResults ? [...s.testResults] : new Array(total).fill(null)
+      for (const r of (a.results || [])) {
+        const idx = typeof r.index === 'number' ? r.index : arr.findIndex(x => x && x.name === r.name)
+        if (idx >= 0 && idx < total) arr[idx] = { name: r.name, pass: r.pass }
+      }
+      s.testResults = arr
+      s.me.score = arr.filter(x => x && x.pass).length
+      s.me.stage = Math.max(1, Math.min(3, 1 + Math.floor((3 * s.me.score) / Math.max(1, total))))
       break
     }
     case 'SUBMIT': submit(s); break

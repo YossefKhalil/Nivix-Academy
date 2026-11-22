@@ -35,8 +35,8 @@ function SegTabs({ value, onChange, items }: { value: string; onChange: (v: stri
     <div
       className="relative inline-flex items-center overflow-hidden"
       style={{
-        width: 260,
-        height: 30,
+        width: 236,
+        height: 28,
         borderRadius: 6,
         clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
         background: 'linear-gradient(180deg, color-mix(in oklab, var(--surface-raised) 92%, black), color-mix(in oklab, var(--surface) 96%, black))',
@@ -1284,19 +1284,21 @@ function Workspace({ s, send }: { s: State; send: Send }) {
 function Tester({ s, send }: { s: State; send: Send }) {
   const R = ROUNDS[s.round - 1]
   const results = s.testResults
-  const shown = results ?? (s.ranTests ? R.tests.filter(t => t.visible || s.final) : [])
+  const shown = results
+    ? R.tests.map((t, i) => results[i] ? { name: results[i]!.name, pass: results[i]!.pass, i } : null).filter((x): x is { name: string; pass: boolean; i: number } => !!x)
+    : []
   const passed = shown.filter(t => t.pass).length
   const failed = shown.length - passed
   const score = s.me.score != null ? `${s.me.score}/${R.tests.length}` : '-'
 
   const runTests = async () => {
-    const r = await judgeRound(s.round, s.me.lang)
+    const r = await judgeRound(s.round, s.me.lang, 'visible')
     if (r?.results) send({ type: 'TESTS_RESULT', results: r.results })
-    else send({ type: 'RUN_TESTS' })
   }
   const submit = async () => {
     if (s.me.submitted) return
-    const r = await judgeRound(s.round, s.me.lang)
+    const haveVisible = Array.isArray(s.testResults) && s.testResults.some(Boolean)
+    const r = await judgeRound(s.round, s.me.lang, haveVisible ? 'hidden' : 'all')
     if (r?.results) send({ type: 'TESTS_RESULT', results: r.results })
     send({ type: 'SUBMIT' })
   }
@@ -1332,7 +1334,7 @@ function Tester({ s, send }: { s: State; send: Send }) {
       <div className="flex-1 overflow-auto px-2 py-1 flex flex-col gap-1">
         {!shown.length && (
           <div className="flex items-center justify-center py-2">
-            <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>RUN to judge your server against the suite</span>
+            <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>RUN visible tests - SUBMIT for the hidden suite</span>
           </div>
         )}
         {shown.map((t, i) => (

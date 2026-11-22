@@ -250,8 +250,8 @@ function context7Config() {
   const cfg = config.read()
   return {
     key: cfg.context7Key || process.env.CONTEXT7_API_KEY || '',
-    base: cfg.context7Base || process.env.CONTEXT7_BASE_URL || 'https://context7.com',
-    path: cfg.context7Path || process.env.CONTEXT7_SEARCH_PATH || '/api/v1/search',
+    base: cfg.context7Base || process.env.CONTEXT7_BASE_URL || 'https://context7.com/api',
+    path: cfg.context7Path || process.env.CONTEXT7_SEARCH_PATH || '/v2/libs/search',
   }
 }
 
@@ -300,7 +300,7 @@ const server = http.createServer(async (req, res) => {
         const body = await readJson(req)
         const lang = body.lang === 'csharp' ? 'csharp' : 'python'
         try { await runner.start(lang) } catch { /* judge will just fail the probes */ }
-        const results = await runRound({ round: Number(body.round) || 1, port: runner.port || (lang === 'python' ? 8081 : 8080) })
+        const results = await runRound({ round: Number(body.round) || 1, port: runner.port || (lang === 'python' ? 8081 : 8080), suite: body.suite || 'all' })
         return sendJson(res, 200, { ok: true, round: Number(body.round) || 1, lang, port: runner.port, results })
       }
 
@@ -482,14 +482,23 @@ const server = http.createServer(async (req, res) => {
         const base = rawBase.replace(/\/$/, '')
         if (!key) return sendJson(res, 503, { ok: false, error: 'Context7 offline: set CONTEXT7_API_KEY in agent/.env' })
         try {
-          const r = await fetch(`${base}${searchPath}?query=${encodeURIComponent(q)}`, { headers: { authorization: `Bearer ${key}` } })
-          const j = await r.json()
-          const raw = j.results || j.data || j.libraries || []
-          const results = (Array.isArray(raw) ? raw : []).slice(0, 8).map((x) => ({
-            title: x.title || x.name || x.id || 'result',
-            url: x.url || x.link || x.source || '',
-            source: x.source || x.provider || 'context7',
-          }))
+          const u = new URL(`${base}${searchPath}`)
+          u.searchParams.set('query', q)
+          u.searchParams.set('libraryName', q)
+          const r = await fetch(u, { headers: { authorization: `Bearer ${key}`, 'x-context7-api-key': key } })
+          const text = await r.text()
+          let j = null
+          try { j = text ? JSON.parse(text) : null } catch { j = null }
+          if (!r.ok) return sendJson(res, 502, { ok: false, error: (j && (j.message || j.error)) || `Context7 HTTP ${r.status}` })
+          const raw = j?.results || j?.data || j?.libraries || []
+          const results = (Array.isArray(raw) ? raw : []).slice(0, 8).map((x) => {
+            const id = String(x.id || x.libraryId || '').replace(/^\/+/, '')
+            return {
+              title: x.title || x.name || x.id || 'result',
+              url: x.url || (id ? `https://context7.com/${id}` : ''),
+              source: x.trustScore != null ? `trust ${x.trustScore}` : (x.source || x.provider || 'context7'),
+            }
+          })
           return sendJson(res, 200, { ok: true, results })
         } catch (e) {
           return sendJson(res, 502, { ok: false, error: String(e?.message || e) })

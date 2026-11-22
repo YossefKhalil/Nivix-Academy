@@ -51,12 +51,12 @@ export async function openInEditor(file?: string, prefer?: string): Promise<Edit
   }
 }
 
-export async function judgeRound(round: number, lang: 'python' | 'csharp') {
+export async function judgeRound(round: number, lang: 'python' | 'csharp', suite: 'visible' | 'hidden' | 'all' = 'all') {
   try {
     const r = await fetch(url('/api/judge'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ round, lang }),
+      body: JSON.stringify({ round, lang, suite }),
     })
     return await r.json()
   } catch {
