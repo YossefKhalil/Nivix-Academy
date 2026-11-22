@@ -1,0 +1,14 @@
+{
+  "name": "nivix-relay",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Nivix Academy relay: authoritative rooms + N-player match state over WebSocket.",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test:edge": "node scripts/edge.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

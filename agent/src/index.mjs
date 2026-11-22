@@ -25,6 +25,7 @@ import { Room } from './room.mjs'
 import { libztAvailable } from './transport.mjs'
 import { ztApi } from './zerotier-api.mjs'
 import { createConfig } from './config.mjs'
+import { startAnnouncer, discover } from './discovery.mjs'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const AGENT_ROOT = resolvePath(here, '..')
