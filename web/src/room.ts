@@ -8,6 +8,7 @@ export interface RoomMember {
   ready: boolean
   host: boolean
   connected: boolean
+  score?: number | null
   via?: string
 }
 
@@ -62,7 +63,7 @@ function normalizeRelay(r: any, you?: string): RoomState {
     started: !!r.match?.active, round: r.match?.round || 1,
     memberCount: r.memberCount || (r.members?.length ?? 0), transport: 'relay', address: null,
     members: (r.members || []).map((m: any) => ({
-      id: m.id, name: m.name, lang: m.lang, ready: !!m.ready, host: !!m.host, connected: m.online !== false,
+      id: m.id, name: m.name, lang: m.lang, ready: !!m.ready, host: !!m.host, connected: m.online !== false, score: m.score ?? null,
     })),
   }
 }

@@ -332,7 +332,38 @@ function MuteButton() {
   )
 }
 
-function Hud({ s, onSettings }: { s: State; onSettings: () => void }) {
+type ScoreRow = { id: string; name: string; lang: 'python' | 'csharp'; score?: number | null; host?: boolean; connected?: boolean }
+
+function ScoreDropdown({ roster }: { roster: ScoreRow[] }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [open])
+  const ranked = [...roster].sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+  return (
+    <span className="relative" onClick={e => e.stopPropagation()}>
+      <button onClick={() => setOpen(o => !o)} className="micro">{open ? '▲' : '▼'} SCORES</button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-[60] w-[250px] p-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          {ranked.length === 0 && <div className="font-mono text-[9px] px-2 py-1" style={{ color: 'var(--text-muted)' }}>no players</div>}
+          {ranked.map((p, i) => (
+            <div key={p.id} className="flex items-center gap-2 px-2 py-1 font-mono text-[10px]">
+              <span style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
+              <span className="flex-1 truncate" style={{ color: p.connected === false ? 'var(--text-muted)' : 'var(--text-secondary)' }}>{p.name}{p.host ? ' ★' : ''}</span>
+              <LangIcon lang={p.lang} size={11} />
+              <span style={{ color: 'var(--color-primary)' }}>{p.score ?? '—'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </span>
+  )
+}
+
+function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; roster: ScoreRow[] }) {
   const total = ROUNDS[s.round - 1].tests.length
   return (
     <header
@@ -376,6 +407,7 @@ function Hud({ s, onSettings }: { s: State; onSettings: () => void }) {
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
           <span className="font-mono text-[13px] tracking-[0.06em]" style={{ fontVariantNumeric: 'tabular-nums', minWidth: 52, textAlign: 'right' }}>{fmt(s.elapsed)}</span>
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
+          <ScoreDropdown roster={roster} />
           <button onClick={onSettings} title="settings" className="relative cursor-pointer bg-transparent border-0 text-[13px] leading-none" style={{ color: 'var(--text-secondary)' }}>⚙</button>
         </div>
       </div>
@@ -487,7 +519,7 @@ function LobbyBackdrop() {
   )
 }
 
-function Lobby({ s, send, agent, onSettings }: { s: State; send: Send; agent: AgentStatus | null; onSettings: () => void }) {
+function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; agent: AgentStatus | null; onSettings: () => void; live: ReturnType<typeof useLiveRoom> }) {
   const seg = (l: 'python' | 'csharp', label: string, i: number) => {
     const active = s.me.lang === l
     return (
@@ -510,7 +542,6 @@ function Lobby({ s, send, agent, onSettings }: { s: State; send: Send; agent: Ag
     )
   }
 
-  const live = useLiveRoom()
   const [joinCode, setJoinCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -713,33 +744,98 @@ function Lobby({ s, send, agent, onSettings }: { s: State; send: Send; agent: Ag
 const PROSE = 'font-roboto text-[13px] leading-7 text-[var(--text-secondary)] [&_p]:my-3 [&_p]:text-[var(--text-muted)] [&_ul]:pl-5 [&_ul]:list-disc [&_li]:my-1.5 [&_li]:text-[var(--text-muted)] [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-primary [&_code]:px-1 [&_code]:bg-[rgba(111,159,245,0.10)]'
 
 function VideoSlice({ video }: { video: { id: string; start: number; end: number; label?: string } }) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  const playerRef = useRef<any>(null)
+  const [started, setStarted] = useState(false)
+  const [ready, setReady] = useState(false)
   const [playing, setPlaying] = useState(false)
-  if (playing) {
+  const [progress, setProgress] = useState(0)
+
+  const ensureApi = (cb: () => void) => {
+    const w = window as any
+    if (w.YT && w.YT.Player) { cb(); return }
+    if (!document.getElementById('yt-iframe-api')) {
+      const s = document.createElement('script')
+      s.id = 'yt-iframe-api'
+      s.src = 'https://www.youtube.com/iframe_api'
+      document.body.appendChild(s)
+    }
+    const prev = w.onYouTubeIframeAPIReady
+    w.onYouTubeIframeAPIReady = () => { if (prev) prev(); cb() }
+  }
+
+  const begin = () => {
+    setStarted(true)
+    ensureApi(() => {
+      if (!hostRef.current || playerRef.current) return
+      const w = window as any
+      playerRef.current = new w.YT.Player(hostRef.current, {
+        videoId: video.id,
+        playerVars: { start: video.start, end: video.end, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3 },
+        events: {
+          onReady: (e: any) => { setReady(true); e.target.seekTo(video.start, true) },
+          onStateChange: (e: any) => setPlaying(e.data === 1),
+        },
+      })
+    })
+  }
+
+  useEffect(() => {
+    if (!started || !ready) return
+    const id = window.setInterval(() => {
+      const p = playerRef.current
+      if (!p || typeof p.getCurrentTime !== 'function') return
+      const t = p.getCurrentTime()
+      // keep the playhead inside [start, end]: no rewinding before, no skipping past
+      if (t < video.start - 0.75) p.seekTo(video.start, true)
+      if (t >= video.end - 0.2) { p.pauseVideo(); p.seekTo(video.end - 0.1, true) }
+      const span = Math.max(1, video.end - video.start)
+      setProgress(Math.max(0, Math.min(1, (t - video.start) / span)))
+    }, 250)
+    return () => window.clearInterval(id)
+  }, [started, ready, video.start, video.end])
+
+  const toggle = () => {
+    const p = playerRef.current
+    if (!p) return
+    if (playing) { p.pauseVideo(); return }
+    const t = p.getCurrentTime()
+    if (t >= video.end - 0.5 || t < video.start) p.seekTo(video.start, true)
+    p.playVideo()
+  }
+
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+  if (!started) {
     return (
-      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }}>
-        <iframe
-          className="absolute inset-0 w-full h-full"
-          src={`https://www.youtube-nocookie.com/embed/${video.id}?start=${video.start}&end=${video.end}&rel=0&modestbranding=1&autoplay=1`}
-          title={video.label || 'Lesson clip'}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
+      <button
+        onClick={begin}
+        className="relative block w-full overflow-hidden cursor-pointer bg-transparent p-0"
+        style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }}
+        title={video.label || 'Play lesson clip'}
+      >
+        <img src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.6 }} />
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(180deg, rgba(4,7,12,0.15), rgba(4,7,12,0.72))' }}>
+          <span className="flex items-center justify-center w-11 h-11 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 88%, transparent)', color: '#04070c', fontSize: 15 }}>▶</span>
+          <span className="font-mono text-[9px] tracking-[0.14em] px-2 text-center" style={{ color: 'var(--text-secondary)' }}>WATCH · {video.label || 'LESSON CLIP'}</span>
+        </span>
+      </button>
     )
   }
+
   return (
-    <button
-      onClick={() => setPlaying(true)}
-      className="relative block w-full overflow-hidden cursor-pointer bg-transparent p-0"
-      style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }}
-      title={video.label || 'Play lesson clip'}
-    >
-      <img src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.6 }} />
-      <span className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(180deg, rgba(4,7,12,0.15), rgba(4,7,12,0.72))' }}>
-        <span className="flex items-center justify-center w-11 h-11 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 88%, transparent)', color: '#04070c', fontSize: 15 }}>▶</span>
-        <span className="font-mono text-[9px] tracking-[0.14em] px-2 text-center" style={{ color: 'var(--text-secondary)' }}>WATCH · {video.label || 'LESSON CLIP'}</span>
-      </span>
-    </button>
+    <div className="relative w-full overflow-hidden" style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)', background: '#000' }}>
+      <div ref={hostRef} className="absolute inset-0 w-full h-full" />
+      {/* blocks the YouTube title / logo click-through */}
+      <div className="absolute inset-x-0 top-0 h-[64px] cursor-pointer" onClick={toggle} />
+      <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 px-2 py-1.5" style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.82), transparent)' }}>
+        <button onClick={toggle} className="micro">{playing ? '❚❚' : '▶'}</button>
+        <span className="flex-1 h-[3px] overflow-hidden" style={{ background: 'rgba(255,255,255,0.18)' }}>
+          <i className="block h-full" style={{ width: `${progress * 100}%`, background: 'var(--color-primary)' }} />
+        </span>
+        <span className="font-mono text-[9px]" style={{ color: 'var(--text-secondary)' }}>{clock(video.start + progress * (video.end - video.start))} / {clock(video.end)}</span>
+      </div>
+    </div>
   )
 }
 
@@ -1005,10 +1101,10 @@ function Tester({ s, send }: { s: State; send: Send }) {
   )
 }
 
-function Match({ s, send, onSettings }: { s: State; send: Send; onSettings: () => void }) {
+function Match({ s, send, onSettings, roster }: { s: State; send: Send; onSettings: () => void; roster: ScoreRow[] }) {
   return (
     <>
-      <Hud s={s} onSettings={onSettings} />
+      <Hud s={s} onSettings={onSettings} roster={roster} />
       <div className="flex-1 grid min-h-0 gap-2 p-2" style={{ gridTemplateColumns: '44% 1fr' }}>
         <section className="grid min-h-0 gap-2" style={{ gridTemplateRows: '1fr 260px' }}>
           <Brief key={`b${s.round}`} s={s} send={send} />
@@ -1259,7 +1355,14 @@ export default function App() {
   const [s, send] = useDuel()
   const sfx = useSfx()
   const agent = useAgent()
+  const live = useLiveRoom()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const roster: ScoreRow[] = live.room?.members?.length
+    ? live.room.members.map(m => ({ id: m.id, name: m.name, lang: m.lang, score: m.score ?? null, host: m.host, connected: m.connected }))
+    : [
+        { id: 'me', name: s.me.name || 'YOU', lang: s.me.lang, score: s.me.score, host: true, connected: true },
+        ...(s.opp.joined ? [{ id: 'opp', name: s.opp.name, lang: s.opp.lang, score: s.opp.score, host: false, connected: s.opp.connected }] : []),
+      ]
   useSoundReactions(s, sfx)
   useGlobalSfx(sfx)
 
@@ -1280,8 +1383,8 @@ export default function App() {
 
         <div className="relative z-10 flex-1 min-h-0 flex flex-col">
           {s.screen === 'boot' && <Boot s={s} send={send} />}
-          {s.screen === 'lobby' && <Lobby s={s} send={send} agent={agent} onSettings={() => setSettingsOpen(true)} />}
-          {s.screen === 'match' && <Match s={s} send={send} onSettings={() => setSettingsOpen(true)} />}
+          {s.screen === 'lobby' && <Lobby s={s} send={send} agent={agent} onSettings={() => setSettingsOpen(true)} live={live} />}
+          {s.screen === 'match' && <Match s={s} send={send} onSettings={() => setSettingsOpen(true)} roster={roster} />}
           {s.screen === 'matchResult' && <Final s={s} send={send} />}
           {s.screen === 'countdown' && <Countdown s={s} />}
           {s.screen === 'roundResult' && <RoundResult s={s} send={send} />}
