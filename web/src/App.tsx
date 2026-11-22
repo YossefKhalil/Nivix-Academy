@@ -11,7 +11,7 @@ import { Animator, Dots, Text, useBleeps } from '@arwes/react'
 import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
-import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, type AgentStatus } from './agent'
+import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, wikiSearch, type AgentStatus } from './agent'
 import { useLiveRoom, createRoom, joinRoom, leaveRoom, getZt, setZtToken, createZtNetwork, relayCreate, relayJoin, relayLeave, type RoomMember } from './room'
 
 type Send = (a: Action) => void
@@ -35,9 +35,10 @@ function SegTabs({ value, onChange, items }: { value: string; onChange: (v: stri
     <div
       className="relative inline-flex items-center overflow-hidden"
       style={{
-        width: 300,
-        height: 32,
-        borderRadius: 999,
+        width: 260,
+        height: 30,
+        borderRadius: 6,
+        clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
         background: 'linear-gradient(180deg, color-mix(in oklab, var(--surface-raised) 92%, black), color-mix(in oklab, var(--surface) 96%, black))',
         boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 28%, transparent), inset 0 2px 12px rgba(0,0,0,0.55), 0 0 20px color-mix(in oklab, var(--color-primary) 10%, transparent)',
       }}
@@ -50,7 +51,7 @@ function SegTabs({ value, onChange, items }: { value: string; onChange: (v: stri
           bottom: 2,
           left: `calc(${idx} * (100% / ${n}) + 2px)`,
           width: `calc(100% / ${n} - 4px)`,
-          borderRadius: 999,
+          borderRadius: 4,
           background: 'linear-gradient(180deg, #8fe0ff, var(--color-primary))',
           boxShadow: '0 0 16px color-mix(in oklab, var(--color-primary) 55%, transparent), inset 0 1px 0 rgba(255,255,255,0.5)',
         }}
@@ -61,7 +62,7 @@ function SegTabs({ value, onChange, items }: { value: string; onChange: (v: stri
           <button
             key={it.id}
             onClick={() => onChange(it.id)}
-            className="relative z-[1] flex-1 h-full font-mono text-[10px] tracking-[0.1em] cursor-pointer"
+            className="relative z-[1] flex-1 h-full font-mono text-[9px] tracking-[0.08em] cursor-pointer"
             style={{ color: active ? '#04070c' : 'var(--text-muted)', fontWeight: active ? 600 : 400 }}
             onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
             onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
@@ -818,7 +819,12 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
   const [current, setCurrent] = useState(video.start)
 
   const span = Math.max(1, video.end - video.start)
-  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+  const clock = (s: number) => {
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = Math.floor(s % 60)
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`
+  }
 
   const ensureApi = (cb: () => void) => {
     const w = window as any
@@ -898,7 +904,13 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
   }
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+    <div className="flex flex-col overflow-hidden" style={{ border: '1px solid color-mix(in oklab, var(--color-primary) 32%, transparent)', boxShadow: '0 0 22px color-mix(in oklab, var(--color-primary) 8%, transparent)' }}>
+      <div className="flex items-center gap-2 px-2.5 py-1" style={{ background: 'color-mix(in oklab, var(--surface-raised) 92%, black)', borderBottom: '1px solid var(--border)' }}>
+        <span className="block w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-primary)', boxShadow: '0 0 8px var(--color-primary)' }} />
+        <span className="font-mono text-[8px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>ARCHIVE FEED</span>
+        <span className="flex-1" />
+        <span className="font-mono text-[8px]" style={{ color: 'var(--text-muted)' }}>{clock(video.start)} - {clock(video.end)}</span>
+      </div>
       <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000' }}>
         <div ref={hostRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
       </div>
@@ -966,6 +978,30 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
     ['401 / 405 / 415 responses', 'RFC 9110'],
   ]
   const canAsk = s.energy >= COST_AI
+  const [wikiQ, setWikiQ] = useState('')
+  const [wikiResults, setWikiResults] = useState<{ title: string; url: string; source: string }[] | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+
+  const submitAsk = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = ask.trim()
+    if (!q || !canAsk) return
+    setAsk('')
+    setNote(null)
+    const r = await nivixAsk(q)
+    if (r?.ok && r.answer) send({ type: 'AI_ANSWER', value: q, answer: r.answer })
+    else setNote(r?.error || 'NIVIX offline: set OPENAI_API_KEY in agent/.env')
+  }
+
+  const submitWiki = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = wikiQ.trim()
+    if (!q) return
+    setNote(null)
+    const r = await wikiSearch(q)
+    if (r?.ok) { setWikiResults(r.results || []); }
+    else setNote(r?.error || 'Context7 offline: set CONTEXT7_API_KEY in agent/.env')
+  }
 
   return (
     <div className="cosmic-panel flex flex-col min-h-0 anim-in">
@@ -1026,8 +1062,26 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
             <span className="flex-1" />
             <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{docs.length}</span>
           </div>
+          <form onSubmit={submitWiki} className="px-3 pt-1 pb-2 shrink-0">
+            <div className="inputgroup">
+              <span className="font-mono text-[11px]" style={{ color: 'var(--color-primary)' }}>⌕</span>
+              <input value={wikiQ} onChange={e => setWikiQ(e.target.value)} placeholder="search docs..." className="flex-1 bg-transparent outline-none font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }} />
+              <button type="submit" className="micro">SEARCH</button>
+            </div>
+            {note && <div className="font-mono text-[8px] mt-1.5" style={{ color: 'var(--color-amber)' }}>{note}</div>}
+          </form>
           <div className="flex-1 overflow-auto px-3 py-2 flex flex-col gap-1.5">
-            {docs.map((d, i) => (
+            {wikiResults && wikiResults.map((d, i) => (
+              <a key={i} href={d.url || '#'} target="_blank" rel="noreferrer" className="group text-left flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}>
+                <span className="font-orbitron text-[13px] shrink-0" style={{ color: 'color-mix(in oklab, var(--accent-secondary) 80%, transparent)' }}>{String(i + 1).padStart(2, '0')}</span>
+                <span className="flex-1 flex flex-col gap-1 min-w-0">
+                  <span className="font-roboto text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{d.title}</span>
+                  <span className="font-mono text-[9px] px-1.5 py-0.5 self-start" style={{ color: 'var(--text-muted)', background: 'color-mix(in oklab, var(--accent-secondary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--accent-secondary) 28%, transparent)' }}>{d.source}</span>
+                </span>
+                <span className="font-mono text-[12px] transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--accent-secondary)' }}>↗</span>
+              </a>
+            ))}
+            {!wikiResults && docs.map((d, i) => (
               <button key={d[0]} className="group text-left flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}>
                 <span className="font-orbitron text-[13px] shrink-0" style={{ color: 'color-mix(in oklab, var(--accent-secondary) 80%, transparent)' }}>{String(i + 1).padStart(2, '0')}</span>
                 <span className="flex-1 flex flex-col gap-1 min-w-0">
@@ -1071,7 +1125,7 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
               </div>
             ))}
           </div>
-          <form onSubmit={e => { e.preventDefault(); if (ask.trim()) { send({ type: 'ASK', value: ask.trim() }); setAsk('') } }} style={{ borderTop: '1px solid var(--border)' }}>
+          <form onSubmit={submitAsk} style={{ borderTop: '1px solid var(--border)' }}>
             <div className="p-2">
               <div className="inputgroup">
                 <span className="font-mono text-[11px]" style={{ color: canAsk ? 'var(--color-green)' : 'var(--color-red)' }}>⚡</span>

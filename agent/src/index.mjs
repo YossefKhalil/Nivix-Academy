@@ -31,6 +31,10 @@ import { RelayClient } from './relay-client.mjs'
 const here = fileURLToPath(new URL('.', import.meta.url))
 const AGENT_ROOT = resolvePath(here, '..')
 
+// Load agent/.env (and a repo-level .env) if present.
+try { process.loadEnvFile(join(AGENT_ROOT, '.env')) } catch { /* no agent .env */ }
+try { process.loadEnvFile(join(AGENT_ROOT, '..', '.env')) } catch { /* no repo .env */ }
+
 const argv = process.argv.slice(2)
 const flag = name => argv.includes(`--${name}`)
 const opt = (name, def) => {
@@ -423,6 +427,58 @@ const server = http.createServer(async (req, res) => {
         const file = lang === 'csharp' ? join(WORKSPACE, 'csharp', 'Program.cs') : join(WORKSPACE, 'python', 'server.py')
         writeFileSync(file, String(body.content ?? ''))
         return sendJson(res, 200, { ok: true, lang })
+      }
+
+      if (url.pathname === '/api/nivix' && req.method === 'POST') {
+        const body = await readJson(req)
+        const question = String(body.question || '').trim()
+        if (!question) return sendJson(res, 400, { ok: false, error: 'question required' })
+        const key = process.env.OPENAI_API_KEY
+        const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
+        const model = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+        if (!key) return sendJson(res, 503, { ok: false, error: 'NIVIX offline: set OPENAI_API_KEY in agent/.env' })
+        try {
+          const r = await fetch(base + '/chat/completions', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+              model,
+              temperature: 0.3,
+              messages: [
+                { role: 'system', content: 'You are NIVIX, a concise HTTP and networking tutor inside a coding game. Answer in 2-4 sentences with one concrete example. Plain text only.' },
+                { role: 'user', content: question },
+              ],
+            }),
+          })
+          const j = await r.json()
+          const answer = j?.choices?.[0]?.message?.content
+          if (!answer) return sendJson(res, 502, { ok: false, error: j?.error?.message || 'no answer' })
+          return sendJson(res, 200, { ok: true, answer })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
+      }
+
+      if (url.pathname === '/api/wiki' && req.method === 'GET') {
+        const q = url.searchParams.get('q') || ''
+        if (!q) return sendJson(res, 400, { ok: false, error: 'q required' })
+        const key = process.env.CONTEXT7_API_KEY
+        const base = (process.env.CONTEXT7_BASE_URL || 'https://context7.com').replace(/\/$/, '')
+        const searchPath = process.env.CONTEXT7_SEARCH_PATH || '/api/v1/search'
+        if (!key) return sendJson(res, 503, { ok: false, error: 'Context7 offline: set CONTEXT7_API_KEY in agent/.env' })
+        try {
+          const r = await fetch(`${base}${searchPath}?query=${encodeURIComponent(q)}`, { headers: { authorization: `Bearer ${key}` } })
+          const j = await r.json()
+          const raw = j.results || j.data || j.libraries || []
+          const results = (Array.isArray(raw) ? raw : []).slice(0, 8).map((x) => ({
+            title: x.title || x.name || x.id || 'result',
+            url: x.url || x.link || x.source || '',
+            source: x.source || x.provider || 'context7',
+          }))
+          return sendJson(res, 200, { ok: true, results })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
       }
 
       return sendJson(res, 404, { ok: false, error: 'unknown endpoint' })

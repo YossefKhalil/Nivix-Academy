@@ -45,7 +45,7 @@ export interface State {
   countdown: number; mockOpen: boolean
 }
 
-export type Action = { type: string; value?: string; results?: { name: string; pass: boolean }[] }
+export type Action = { type: string; value?: string; results?: { name: string; pass: boolean }[]; answer?: string }
 
 export function initial(): State {
   return {
@@ -152,6 +152,9 @@ export function reduce(s0: State, a: Action): State {
     case 'ASK':
       if (s.energy < COST_AI) { s.wiki.push({ q: a.value as string, a: 'Not enough energy - ' + s.energy + ' left, ' + COST_AI + ' needed.' }); break }
       s.energy -= COST_AI; s.wiki.push({ q: a.value as string, a: aiAnswer(a.value as string) }); break
+    case 'AI_ANSWER':
+      if (s.energy < COST_AI) { s.wiki.push({ q: a.value as string, a: 'Not enough energy - ' + s.energy + ' left, ' + COST_AI + ' needed.' }); break }
+      s.energy -= COST_AI; s.wiki.push({ q: a.value as string, a: a.answer as string }); break
     case 'VSCODE': sys(s.chat, 'WORKSPACE OPENED IN VS CODE'); break
     case 'SYS_NOTE': sys(s.chat, a.value as string); break
     case 'RUN_TESTS': runTests(s); break

@@ -83,3 +83,21 @@ export async function saveCode(lang: 'python' | 'csharp', content: string): Prom
     return r.ok
   } catch { return false }
 }
+
+export async function nivixAsk(question: string): Promise<{ ok: boolean; answer?: string; error?: string } | null> {
+  try {
+    const r = await fetch(url('/api/nivix'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ question }),
+      signal: AbortSignal.timeout(30000),
+    })
+    return await r.json()
+  } catch { return null }
+}
+
+export async function wikiSearch(q: string): Promise<{ ok: boolean; results?: { title: string; url: string; source: string }[]; error?: string } | null> {
+  try {
+    return await (await fetch(url(`/api/wiki?q=${encodeURIComponent(q)}`))).json()
+  } catch { return null }
+}
