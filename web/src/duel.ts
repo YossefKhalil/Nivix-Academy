@@ -1,4 +1,4 @@
-/* HTTP DUEL — mock state machine.
+/* HTTP DUEL - mock state machine.
    Ported from http-duel/prototype/duel-ux-mock.html.
    Pure logic only; the React layer lives in App.tsx. */
 
@@ -118,7 +118,7 @@ function tick(s: State) {
 }
 export function aiAnswer(q: string) {
   const t = q.toLowerCase()
-  if (t.includes('www-authenticate') || t.includes('401')) return 'Send <code>401</code> with <code>WWW-Authenticate: Basic realm="admin"</code> on every rejected request — clients need the challenge to retry.'
+  if (t.includes('www-authenticate') || t.includes('401')) return 'Send <code>401</code> with <code>WWW-Authenticate: Basic realm="admin"</code> on every rejected request - clients need the challenge to retry.'
   if (t.includes('base64')) return 'Decode after stripping the <code>Basic </code> prefix, then split on the first colon: <code>base64.b64decode(v).split(b":",1)</code>.'
   if (t.includes('json') || t.includes('post')) return 'Read <code>Content-Length</code>, read exactly that many bytes, then parse. Malformed &rarr; <code>400</code>, wrong content-type &rarr; <code>415</code>.'
   if (t.includes('404') || t.includes('route')) return 'Match the request path exactly; anything unknown returns <code>404</code>. Keep routing in one place.'
@@ -150,7 +150,7 @@ export function reduce(s0: State, a: Action): State {
       s.hintsOpen = !s.hintsOpen; break
     case 'LEFT_TAB': s.leftTab = a.value as State['leftTab']; break
     case 'ASK':
-      if (s.energy < COST_AI) { s.wiki.push({ q: a.value as string, a: 'Not enough energy — ' + s.energy + ' left, ' + COST_AI + ' needed.' }); break }
+      if (s.energy < COST_AI) { s.wiki.push({ q: a.value as string, a: 'Not enough energy - ' + s.energy + ' left, ' + COST_AI + ' needed.' }); break }
       s.energy -= COST_AI; s.wiki.push({ q: a.value as string, a: aiAnswer(a.value as string) }); break
     case 'VSCODE': sys(s.chat, 'WORKSPACE OPENED IN VS CODE'); break
     case 'SYS_NOTE': sys(s.chat, a.value as string); break

@@ -1,4 +1,4 @@
-/* Course content — single source of truth shared with the agent judge.
+/* Course content - single source of truth shared with the agent judge.
    Lives at /content/lessons.json so the agent can read the same file. */
 // @ts-ignore JSON import resolved by Vite + resolveJsonModule
 import data from '../../content/lessons.json'

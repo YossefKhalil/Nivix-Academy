@@ -33,40 +33,40 @@ function SegTabs({ value, onChange, items }: { value: string; onChange: (v: stri
   const idx = Math.max(0, items.findIndex(i => i.id === value))
   return (
     <div
-      className="relative inline-flex overflow-hidden"
+      className="relative inline-flex items-center overflow-hidden"
       style={{
         width: 300,
-        border: '1px solid var(--border)',
-        background: 'color-mix(in oklab, var(--surface) 94%, black)',
-        clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)',
+        height: 32,
+        borderRadius: 999,
+        background: 'linear-gradient(180deg, color-mix(in oklab, var(--surface-raised) 92%, black), color-mix(in oklab, var(--surface) 96%, black))',
+        boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 28%, transparent), inset 0 2px 12px rgba(0,0,0,0.55), 0 0 20px color-mix(in oklab, var(--color-primary) 10%, transparent)',
       }}
     >
       <span
         aria-hidden
-        className="absolute top-0 bottom-0 transition-all duration-300 ease-out"
+        className="absolute transition-all duration-300 ease-out"
         style={{
-          left: `${(100 / n) * idx}%`,
-          width: `${100 / n}%`,
-          background: 'linear-gradient(180deg, color-mix(in oklab, var(--color-primary) 28%, transparent), color-mix(in oklab, var(--color-primary) 8%, transparent))',
-          boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 50%, transparent), 0 0 18px color-mix(in oklab, var(--color-primary) 22%, transparent)',
-          clipPath: 'polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%)',
+          top: 2,
+          bottom: 2,
+          left: `calc(${idx} * (100% / ${n}) + 2px)`,
+          width: `calc(100% / ${n} - 4px)`,
+          borderRadius: 999,
+          background: 'linear-gradient(180deg, #8fe0ff, var(--color-primary))',
+          boxShadow: '0 0 16px color-mix(in oklab, var(--color-primary) 55%, transparent), inset 0 1px 0 rgba(255,255,255,0.5)',
         }}
       />
-      {items.map((it, i) => {
+      {items.map(it => {
         const active = value === it.id
         return (
           <button
             key={it.id}
             onClick={() => onChange(it.id)}
-            className="relative z-[1] flex-1 font-mono text-[10px] tracking-[0.12em] py-[7px] cursor-pointer"
-            style={{ color: active ? 'var(--color-primary)' : 'var(--text-muted)' }}
+            className="relative z-[1] flex-1 h-full font-mono text-[10px] tracking-[0.1em] cursor-pointer"
+            style={{ color: active ? '#04070c' : 'var(--text-muted)', fontWeight: active ? 600 : 400 }}
             onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
             onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
           >
-            <span className="inline-flex items-center gap-1.5">
-              <span className="font-orbitron text-[9px]" style={{ color: active ? 'var(--color-primary)' : 'var(--text-muted)' }}>{String(i + 1).padStart(2, '0')}</span>
-              {it.label}
-            </span>
+            {it.label}
           </button>
         )
       })}
@@ -383,7 +383,7 @@ function ScoreCard({ row, you, total }: { row: ScoreRow; you?: boolean; total: n
           />
         ))}
       </span>
-      <span className="font-mono text-[12px]" style={{ color: tone, fontVariantNumeric: 'tabular-nums' }}>{row.score ?? '—'}<span style={{ color: 'var(--text-muted)' }}>/{total}</span></span>
+      <span className="font-mono text-[12px]" style={{ color: tone, fontVariantNumeric: 'tabular-nums' }}>{row.score ?? '-'}<span style={{ color: 'var(--text-muted)' }}>/{total}</span></span>
     </span>
   )
 }
@@ -408,7 +408,7 @@ function ScoreDropdown({ roster }: { roster: ScoreRow[] }) {
               <span style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
               <span className="flex-1 truncate" style={{ color: p.connected === false ? 'var(--text-muted)' : 'var(--text-secondary)' }}>{p.name}{p.host ? ' ★' : ''}</span>
               <LangIcon lang={p.lang} size={11} />
-              <span style={{ color: 'var(--color-primary)' }}>{p.score ?? '—'}</span>
+              <span style={{ color: 'var(--color-primary)' }}>{p.score ?? '-'}</span>
             </div>
           ))}
         </div>
@@ -434,7 +434,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
     >
       <span aria-hidden className="absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--color-primary) 55%, transparent), transparent)' }} />
 
-      {/* left — identity + you */}
+      {/* left - identity + you */}
       <div className="flex items-center justify-between gap-4 min-w-0">
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-orbitron font-bold text-[13px] tracking-[0.18em]" style={{ color: 'var(--color-primary)', textShadow: 'var(--text-glow-green)' }}>◈ NIVIX ACADEMY</span>
@@ -444,7 +444,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
         <ScoreCard row={me} you total={total} />
       </div>
 
-      {/* centre — VS (own column, so it stays centred) */}
+      {/* centre - VS (own column, so it stays centred) */}
       <span
         className="grid place-items-center w-[40px] h-[28px] font-orbitron font-bold text-[11px] tracking-[0.16em]"
         style={{
@@ -457,7 +457,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
         VS
       </span>
 
-      {/* right — opponent + vitals */}
+      {/* right - opponent + vitals */}
       <div className="flex items-center justify-between gap-4 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           {opponent
@@ -891,7 +891,7 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
         <span className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(180deg, rgba(4,7,12,0.15), rgba(4,7,12,0.78))' }}>
           <span className="flex items-center justify-center w-12 h-12 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 90%, transparent)', color: '#04070c', fontSize: 16, boxShadow: '0 0 24px color-mix(in oklab, var(--color-primary) 45%, transparent)' }}>▶</span>
           <span className="font-mono text-[9px] tracking-[0.14em] px-2 text-center" style={{ color: 'var(--text-secondary)' }}>WATCH · {video.label || 'LESSON CLIP'}</span>
-          <span className="font-mono text-[8px]" style={{ color: 'var(--text-muted)' }}>{clock(video.start)} – {clock(video.end)}</span>
+          <span className="font-mono text-[8px]" style={{ color: 'var(--text-muted)' }}>{clock(video.start)} - {clock(video.end)}</span>
         </span>
       </button>
     )
@@ -916,7 +916,7 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-[9px] tracking-[0.12em] truncate" style={{ color: 'var(--text-muted)' }}>{(video.label || 'CLIP').toUpperCase()}</span>
-          <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)' }}>{clock(video.start)} – {clock(video.end)}</span>
+          <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)' }}>{clock(video.start)} - {clock(video.end)}</span>
           <span className="flex-1" />
           <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{clock(Math.max(video.start, Math.min(video.end, current)))} <span style={{ color: 'var(--text-muted)' }}>/ {clock(video.end)}</span></span>
           <button onClick={restart} className="micro shrink-0">⟲ RESTART</button>
@@ -961,7 +961,7 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
   const docs = [
     ['Python · http.server.BaseHTTPRequestHandler', 'context7'],
     ['HTTP Authorization header / Basic scheme', 'MDN'],
-    ['base64 — encode & decode', 'Python docs'],
+    ['base64 - encode & decode', 'Python docs'],
     ['C# · System.Net.HttpListener', 'learn.microsoft.com'],
     ['401 / 405 / 415 responses', 'RFC 9110'],
   ]
@@ -983,7 +983,7 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
             {s.chat.length === 0 && (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 py-6">
                 <span className="font-orbitron text-[22px]" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>◌</span>
-                <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>no traffic yet — say hi</span>
+                <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>no traffic yet - say hi</span>
               </div>
             )}
             {s.chat.map((m, i) => m.sys
@@ -1075,7 +1075,7 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
             <div className="p-2">
               <div className="inputgroup">
                 <span className="font-mono text-[11px]" style={{ color: canAsk ? 'var(--color-green)' : 'var(--color-red)' }}>⚡</span>
-                <input value={ask} onChange={e => setAsk(e.target.value)} placeholder={`ask nivix — ${COST_AI}⚡`} className="flex-1 bg-transparent outline-none font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }} />
+                <input value={ask} onChange={e => setAsk(e.target.value)} placeholder={`ask nivix - ${COST_AI}⚡`} className="flex-1 bg-transparent outline-none font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }} />
                 <button type="submit" disabled={!canAsk} className="micro">ASK</button>
               </div>
             </div>
@@ -1237,7 +1237,7 @@ function Tester({ s, send }: { s: State; send: Send }) {
   const shown = results ?? (s.ranTests ? R.tests.filter(t => t.visible || s.final) : [])
   const passed = shown.filter(t => t.pass).length
   const failed = shown.length - passed
-  const score = s.me.score != null ? `${s.me.score}/${R.tests.length}` : '—'
+  const score = s.me.score != null ? `${s.me.score}/${R.tests.length}` : '-'
 
   const runTests = async () => {
     const r = await judgeRound(s.round, s.me.lang)
