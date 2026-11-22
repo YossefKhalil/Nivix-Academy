@@ -712,6 +712,37 @@ function Lobby({ s, send, agent, onSettings }: { s: State; send: Send; agent: Ag
 
 const PROSE = 'font-roboto text-[13px] leading-7 text-[var(--text-secondary)] [&_p]:my-3 [&_p]:text-[var(--text-muted)] [&_ul]:pl-5 [&_ul]:list-disc [&_li]:my-1.5 [&_li]:text-[var(--text-muted)] [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-primary [&_code]:px-1 [&_code]:bg-[rgba(111,159,245,0.10)]'
 
+function VideoSlice({ video }: { video: { id: string; start: number; end: number; label?: string } }) {
+  const [playing, setPlaying] = useState(false)
+  if (playing) {
+    return (
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }}>
+        <iframe
+          className="absolute inset-0 w-full h-full"
+          src={`https://www.youtube-nocookie.com/embed/${video.id}?start=${video.start}&end=${video.end}&rel=0&modestbranding=1&autoplay=1`}
+          title={video.label || 'Lesson clip'}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    )
+  }
+  return (
+    <button
+      onClick={() => setPlaying(true)}
+      className="relative block w-full overflow-hidden cursor-pointer bg-transparent p-0"
+      style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }}
+      title={video.label || 'Play lesson clip'}
+    >
+      <img src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.6 }} />
+      <span className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(180deg, rgba(4,7,12,0.15), rgba(4,7,12,0.72))' }}>
+        <span className="flex items-center justify-center w-11 h-11 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 88%, transparent)', color: '#04070c', fontSize: 15 }}>▶</span>
+        <span className="font-mono text-[9px] tracking-[0.14em] px-2 text-center" style={{ color: 'var(--text-secondary)' }}>WATCH · {video.label || 'LESSON CLIP'}</span>
+      </span>
+    </button>
+  )
+}
+
 function Brief({ s, send }: { s: State; send: Send }) {
   const R = ROUNDS[s.round - 1]
   return (
@@ -720,6 +751,7 @@ function Brief({ s, send }: { s: State; send: Send }) {
       <div className="flex-1 overflow-auto px-5 py-4">
         <Animator key={s.round}>
           <Text as="h1" manager="decipher" className="font-orbitron text-[17px] tracking-[0.06em] mb-3 block">{R.title}</Text>
+        {R.video && <div className="mb-4"><VideoSlice video={R.video} /></div>}
         </Animator>
         <div className={PROSE} dangerouslySetInnerHTML={{ __html: R.brief }} />
         <button

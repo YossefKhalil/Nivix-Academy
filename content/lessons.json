@@ -10,7 +10,13 @@
       "brief": "<p>Before writing any code, it helps to know <em>where</em> HTTP lives. The OSI model splits network communication into seven layers; HTTP is an <strong>application-layer</strong> (layer 7) protocol, and it relies on everything below it.</p><ul><li><strong>7 · Application</strong> — you are here. HTTP, DNS, TLS.</li><li><strong>6 · Presentation</strong> — encoding, compression, TLS records.</li><li><strong>5 · Session</strong> — connection state.</li><li><strong>4 · Transport</strong> — TCP/UDP. HTTP/1.1 rides on TCP: ordered, reliable bytes.</li><li><strong>3 · Network</strong> — IP addresses and routing between machines.</li><li><strong>1–2 · Link/Physical</strong> — Ethernet, Wi‑Fi, the wire.</li></ul><p>When your Python or C# server binds a port and someone connects, TCP (layer 4) has already done the handshake and guaranteed the bytes arrive. Your job is purely layer 7: read the request text, decide what it means, and write a response.</p><p><strong>Watch</strong> the OSI-model video for this lesson, then continue to <em>HTTP — Protocol Introduction</em>.</p>",
       "hints": "<p>Nothing to build in this lesson — it is context. Press <em>Skip</em> if you already know the layers.</p>",
       "starters": {},
-      "tests": []
+      "tests": [],
+      "video": {
+        "id": "2JYT5f2isg4",
+        "start": 212,
+        "end": 1651,
+        "label": "Ch 1 — Why HTTP"
+      }
     },
     {
       "id": 85,
@@ -26,12 +32,33 @@
         "csharp": "using System.Net;\nusing System.Text;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\nConsole.WriteLine(\"listening on :8080\");\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    // TODO: route \"/\" and \"/health\"; 404 otherwise\n    ctx.Response.StatusCode = 200;\n    var body = Encoding.UTF8.GetBytes(\"OK\");\n    ctx.Response.ContentType = \"text/plain\";\n    ctx.Response.OutputStream.Write(body);\n    ctx.Response.Close();\n}\n"
       },
       "tests": [
-        { "name": "GET / -> 200 OK", "visible": true },
-        { "name": "GET / -> text/plain", "visible": true },
-        { "name": "GET /health -> body UP", "visible": true },
-        { "name": "GET /health -> 200", "visible": false },
-        { "name": "GET /nope -> 404", "visible": false }
-      ]
+        {
+          "name": "GET / -> 200 OK",
+          "visible": true
+        },
+        {
+          "name": "GET / -> text/plain",
+          "visible": true
+        },
+        {
+          "name": "GET /health -> body UP",
+          "visible": true
+        },
+        {
+          "name": "GET /health -> 200",
+          "visible": false
+        },
+        {
+          "name": "GET /nope -> 404",
+          "visible": false
+        }
+      ],
+      "video": {
+        "id": "2JYT5f2isg4",
+        "start": 212,
+        "end": 1651,
+        "label": "Ch 1 — Why HTTP: clients & servers"
+      }
     },
     {
       "id": 86,
@@ -47,13 +74,37 @@
         "csharp": "using System.Net;\nusing System.Text;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    var path = ctx.Request.Url!.AbsolutePath;\n    // TODO: /ping, /echo, else 404\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
       },
       "tests": [
-        { "name": "GET /ping -> pong", "visible": true },
-        { "name": "GET /echo?msg=hi -> hi", "visible": true },
-        { "name": "GET /echo (no msg) -> 400", "visible": true },
-        { "name": "GET /nope -> 404", "visible": false },
-        { "name": "GET /echo?msg= spaces preserved", "visible": false },
-        { "name": "GET /ping -> 200", "visible": false }
-      ]
+        {
+          "name": "GET /ping -> pong",
+          "visible": true
+        },
+        {
+          "name": "GET /echo?msg=hi -> hi",
+          "visible": true
+        },
+        {
+          "name": "GET /echo (no msg) -> 400",
+          "visible": true
+        },
+        {
+          "name": "GET /nope -> 404",
+          "visible": false
+        },
+        {
+          "name": "GET /echo?msg= spaces preserved",
+          "visible": false
+        },
+        {
+          "name": "GET /ping -> 200",
+          "visible": false
+        }
+      ],
+      "video": {
+        "id": "2JYT5f2isg4",
+        "start": 7494,
+        "end": 8464,
+        "label": "Ch 6 — HTTP Headers"
+      }
     },
     {
       "id": 87,
@@ -69,12 +120,33 @@
         "csharp": "using System.Net;\nusing System.Text;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    var path = ctx.Request.Url!.AbsolutePath;\n    var q = ctx.Request.QueryString;\n    // TODO: /, /sum?a=&b=, /routes, else 404\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
       },
       "tests": [
-        { "name": "GET /sum?a=2&b=3 -> 5", "visible": true },
-        { "name": "GET /sum?a=x -> 400", "visible": true },
-        { "name": "GET /routes -> list of paths", "visible": true },
-        { "name": "GET / -> 200", "visible": false },
-        { "name": "GET /sum (missing b) -> 400", "visible": false }
-      ]
+        {
+          "name": "GET /sum?a=2&b=3 -> 5",
+          "visible": true
+        },
+        {
+          "name": "GET /sum?a=x -> 400",
+          "visible": true
+        },
+        {
+          "name": "GET /routes -> list of paths",
+          "visible": true
+        },
+        {
+          "name": "GET / -> 200",
+          "visible": false
+        },
+        {
+          "name": "GET /sum (missing b) -> 400",
+          "visible": false
+        }
+      ],
+      "video": {
+        "id": "2JYT5f2isg4",
+        "start": 11821,
+        "end": 12993,
+        "label": "Ch 9 — URL Paths & queries"
+      }
     },
     {
       "id": 88,
@@ -90,15 +162,45 @@
         "csharp": "using System.Net;\nusing System.Text;\n\nconst string USER = \"nova\", PASS = \"duel\";\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    // TODO: protect /admin\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
       },
       "tests": [
-        { "name": "GET /admin, no auth -> 401", "visible": true },
-        { "name": "GET /admin, valid -> 200", "visible": true },
-        { "name": "401 sends WWW-Authenticate: Basic", "visible": true },
-        { "name": "wrong user -> 401", "visible": false },
-        { "name": "wrong password -> 401", "visible": false },
-        { "name": "POST /admin -> 405", "visible": false },
-        { "name": "malformed base64 -> 401", "visible": false },
-        { "name": "lowercase scheme -> 200", "visible": false }
-      ]
+        {
+          "name": "GET /admin, no auth -> 401",
+          "visible": true
+        },
+        {
+          "name": "GET /admin, valid -> 200",
+          "visible": true
+        },
+        {
+          "name": "401 sends WWW-Authenticate: Basic",
+          "visible": true
+        },
+        {
+          "name": "wrong user -> 401",
+          "visible": false
+        },
+        {
+          "name": "wrong password -> 401",
+          "visible": false
+        },
+        {
+          "name": "POST /admin -> 405",
+          "visible": false
+        },
+        {
+          "name": "malformed base64 -> 401",
+          "visible": false
+        },
+        {
+          "name": "lowercase scheme -> 200",
+          "visible": false
+        }
+      ],
+      "video": {
+        "id": "2JYT5f2isg4",
+        "start": 7494,
+        "end": 8464,
+        "label": "Ch 6 — Headers (Authorization)"
+      }
     },
     {
       "id": 89,
@@ -114,13 +216,37 @@
         "csharp": "using System.Net;\nusing System.Text;\n\nconst string TOKEN = \"nivix-secret\";\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    // TODO: protect /data\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
       },
       "tests": [
-        { "name": "GET /data, no auth -> 401", "visible": true },
-        { "name": "GET /data, valid bearer -> 200", "visible": true },
-        { "name": "401 sends WWW-Authenticate: Bearer", "visible": true },
-        { "name": "wrong token -> 401", "visible": false },
-        { "name": "wrong scheme (Basic) -> 401", "visible": false },
-        { "name": "valid -> JSON content-type", "visible": false }
-      ]
+        {
+          "name": "GET /data, no auth -> 401",
+          "visible": true
+        },
+        {
+          "name": "GET /data, valid bearer -> 200",
+          "visible": true
+        },
+        {
+          "name": "401 sends WWW-Authenticate: Bearer",
+          "visible": true
+        },
+        {
+          "name": "wrong token -> 401",
+          "visible": false
+        },
+        {
+          "name": "wrong scheme (Basic) -> 401",
+          "visible": false
+        },
+        {
+          "name": "valid -> JSON content-type",
+          "visible": false
+        }
+      ],
+      "video": {
+        "id": "2JYT5f2isg4",
+        "start": 7494,
+        "end": 8464,
+        "label": "Ch 6 — Headers (Bearer)"
+      }
     },
     {
       "id": 90,
@@ -136,11 +262,29 @@
         "csharp": "using System.Net;\nusing System.Text;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\nvar client = new HttpClient();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    var path = ctx.Request.Url!.AbsolutePath;\n    if (path == \"/ping\") { /* TODO */ }\n    // TODO: /fetch?url=\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
       },
       "tests": [
-        { "name": "GET /fetch?url=.../ping -> body pong", "visible": true },
-        { "name": "GET /fetch (no url) -> 400", "visible": true },
-        { "name": "GET /ping still works", "visible": false },
-        { "name": "unreachable upstream -> 502", "visible": false }
-      ]
+        {
+          "name": "GET /fetch?url=.../ping -> body pong",
+          "visible": true
+        },
+        {
+          "name": "GET /fetch (no url) -> 400",
+          "visible": true
+        },
+        {
+          "name": "GET /ping still works",
+          "visible": false
+        },
+        {
+          "name": "unreachable upstream -> 502",
+          "visible": false
+        }
+      ],
+      "video": {
+        "id": "2JYT5f2isg4",
+        "start": 16390,
+        "end": 17116,
+        "label": "Proj — Using Fetch (HTTP client)"
+      }
     },
     {
       "id": 91,
@@ -156,12 +300,33 @@
         "csharp": "using System.Net;\nusing System.Text;\nusing System.Text.Json;\n\nvar listener = new HttpListener();\nlistener.Prefixes.Add(\"http://localhost:8080/\");\nlistener.Start();\n\nwhile (true)\n{\n    var ctx = listener.GetContext();\n    // TODO: POST /submit\n    ctx.Response.StatusCode = 404;\n    ctx.Response.Close();\n}\n"
       },
       "tests": [
-        { "name": "POST /submit (valid JSON) -> 200", "visible": true },
-        { "name": "POST /submit (bad JSON) -> 400", "visible": true },
-        { "name": "POST /submit (missing fields) -> 400", "visible": false },
-        { "name": "POST /submit (wrong content-type) -> 415", "visible": false },
-        { "name": "GET /submit -> 405", "visible": false }
-      ]
+        {
+          "name": "POST /submit (valid JSON) -> 200",
+          "visible": true
+        },
+        {
+          "name": "POST /submit (bad JSON) -> 400",
+          "visible": true
+        },
+        {
+          "name": "POST /submit (missing fields) -> 400",
+          "visible": false
+        },
+        {
+          "name": "POST /submit (wrong content-type) -> 415",
+          "visible": false
+        },
+        {
+          "name": "GET /submit -> 405",
+          "visible": false
+        }
+      ],
+      "video": {
+        "id": "2JYT5f2isg4",
+        "start": 9669,
+        "end": 11821,
+        "label": "Ch 8 — HTTP Methods (POST)"
+      }
     }
   ]
 }

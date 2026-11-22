@@ -14,6 +14,7 @@ export interface Lesson {
   port?: number
   brief: string
   hints: string
+  video?: { id: string; start: number; end: number; label?: string }
   starters: { python?: string; csharp?: string }
   tests: LessonTest[]
 }
