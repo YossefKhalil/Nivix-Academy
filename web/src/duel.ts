@@ -4,7 +4,7 @@
 
 export type Lang = 'python' | 'csharp'
 export interface Test { name: string; visible?: boolean; pass?: boolean }
-export interface RoundDef { tag: string; title: string; brief: string; hints: string; tests: Test[]; id?: number; port?: number; video?: { id: string; start: number; end: number; label?: string } }
+export interface RoundDef { tag: string; title: string; brief: string; hints: string; tests: Test[]; id?: number; port?: number; video?: { id: string; start: number; end: number; label?: string; src?: string } }
 
 export const SECTOR = 'HTTP & NETWORKING'
 export const ENERGY_MAX = 10

@@ -789,7 +789,7 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
 
 const PROSE = 'font-roboto text-[13px] leading-7 text-[var(--text-secondary)] [&_p]:my-3 [&_p]:text-[var(--text-muted)] [&_ul]:pl-5 [&_ul]:list-disc [&_li]:my-1.5 [&_li]:text-[var(--text-muted)] [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-primary [&_code]:px-1 [&_code]:bg-[rgba(111,159,245,0.10)]'
 
-function VideoSlice({ video }: { video: { id: string; start: number; end: number; label?: string } }) {
+function VideoSlice({ video }: { video: { id: string; start: number; end: number; label?: string; src?: string } }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const playerRef = useRef<any>(null)
   const seekRef = useRef<HTMLDivElement | null>(null)
@@ -801,6 +801,15 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
 
   const span = Math.max(1, video.end - video.start)
   const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+  // Native path: a hosted clip has zero third-party chrome and no cropping.
+  if (video.src) {
+    return (
+      <div className="w-full overflow-hidden" style={{ border: '1px solid var(--border)', background: '#000' }}>
+        <video src={video.src} controls playsInline style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', background: '#000' }} />
+      </div>
+    )
+  }
 
   const ensureApi = (cb: () => void) => {
     const w = window as any
@@ -824,29 +833,7 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
         videoId: video.id,
         playerVars: { start: video.start, end: video.end, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, fs: 0, cc_load_policy: 0 },
         events: {
-          onReady: (e: any) => {
-            setReady(true)
-            try {
-              const f = e.target.getIframe()
-              if (f) {
-                const style = () => {
-                  f.style.setProperty('position', 'absolute', 'important')
-                  f.style.setProperty('top', '0', 'important')
-                  f.style.setProperty('left', '0', 'important')
-                  f.style.setProperty('width', '100%', 'important')
-                  f.style.setProperty('height', '100%', 'important')
-                  f.style.setProperty('transform', 'none', 'important')
-                  f.style.setProperty('transform-origin', 'center center', 'important')
-                  f.style.setProperty('pointer-events', 'none', 'important')
-                }
-                style()
-                // YouTube re-applies its own styles on resize; keep ours pinned.
-                const guard = window.setInterval(style, 500)
-                window.setTimeout(() => window.clearInterval(guard), 20000)
-              }
-            } catch { /* ignore */ }
-            e.target.seekTo(video.start, true)
-          },
+          onReady: (e: any) => { setReady(true); e.target.seekTo(video.start, true) },
           onStateChange: (e: any) => {
             if (e.data === 0) { e.target.seekTo(video.start, true); e.target.pauseVideo(); setProgress(0); setPlaying(false) }
             else setPlaying(e.data === 1)
