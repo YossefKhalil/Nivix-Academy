@@ -25,6 +25,7 @@ export interface RoomState {
   members: RoomMember[]
   transport: string | null
   address: string | null
+  meId?: string | null
 }
 
 const BASE = (import.meta.env.VITE_AGENT_URL as string | undefined) ?? ''
@@ -61,7 +62,7 @@ function normalizeRelay(r: any, you?: string): RoomState {
     code: r.code, mode: 'multi', network: null, maxPlayers: r.maxPlayers || 8,
     role: you && r.hostId === you ? 'host' : 'guest', hostId: r.hostId || null,
     started: !!r.match?.active, round: r.match?.round || 1,
-    memberCount: r.memberCount || (r.members?.length ?? 0), transport: 'relay', address: null,
+    memberCount: r.memberCount || (r.members?.length ?? 0), transport: 'relay', address: null, meId: you ?? null,
     members: (r.members || []).map((m: any) => ({
       id: m.id, name: m.name, lang: m.lang, ready: !!m.ready, host: !!m.host, connected: m.online !== false, score: m.score ?? null,
     })),

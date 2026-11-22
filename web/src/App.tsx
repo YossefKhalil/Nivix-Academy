@@ -332,7 +332,18 @@ function MuteButton() {
   )
 }
 
-type ScoreRow = { id: string; name: string; lang: 'python' | 'csharp'; score?: number | null; host?: boolean; connected?: boolean }
+type ScoreRow = { id: string; name: string; lang: 'python' | 'csharp'; score?: number | null; host?: boolean; connected?: boolean; me?: boolean }
+
+function ScoreCard({ row, you, total }: { row: ScoreRow; you?: boolean; total: number }) {
+  return (
+    <span className="flex items-center gap-2 px-2 py-1 border min-w-0" style={{ borderColor: you ? 'color-mix(in oklab, var(--color-primary) 45%, transparent)' : 'var(--border)', background: 'color-mix(in oklab, var(--surface-raised) 70%, transparent)' }}>
+      <span className="font-orbitron text-[11px] tracking-[0.08em] truncate" style={{ color: you ? 'var(--color-primary)' : 'var(--text-secondary)' }}>{row.name}</span>
+      <LangIcon lang={row.lang} size={12} />
+      <span className="font-mono text-[10px]" style={{ color: 'var(--color-primary)' }}>{row.score ?? '—'}<span style={{ color: 'var(--text-muted)' }}>/{total}</span></span>
+      {row.connected === false && <span className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>OFF</span>}
+    </span>
+  )
+}
 
 function ScoreDropdown({ roster }: { roster: ScoreRow[] }) {
   const [open, setOpen] = useState(false)
@@ -365,6 +376,10 @@ function ScoreDropdown({ roster }: { roster: ScoreRow[] }) {
 
 function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; roster: ScoreRow[] }) {
   const total = ROUNDS[s.round - 1].tests.length
+  const me = roster.find(p => p.me) || roster[0] || { id: 'me', name: s.me.name || 'YOU', lang: s.me.lang, score: s.me.score, me: true }
+  const others = roster.filter(p => p.id !== me.id)
+  const opponent = others[0]
+  const extra = others.length - 1
   return (
     <header
       className="relative shrink-0 grid items-center gap-4 h-[48px] px-4 whitespace-nowrap"
@@ -383,7 +398,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
           <span className="font-orbitron text-[11px] tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>ROUND {s.round}<span style={{ color: 'var(--text-muted)' }}>/{s.totalRounds}</span></span>
         </div>
-        <Pcard p={s.me} total={total} />
+        <ScoreCard row={me} you total={total} />
       </div>
 
       {/* centre — VS (own column, so it stays centred) */}
@@ -401,7 +416,14 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
 
       {/* right — opponent + vitals */}
       <div className="flex items-center justify-between gap-4 min-w-0">
-        <Pcard p={s.opp} total={total} connection={s.opp.connected} />
+        <div className="flex items-center gap-2 min-w-0">
+          {opponent
+            ? <ScoreCard row={opponent} total={total} />
+            : <span className="font-orbitron text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>WAITING…</span>}
+          {extra > 0 && (
+            <span className="grid place-items-center h-[24px] px-2 font-mono text-[9px]" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)' }}>+{extra}</span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <EnergyGauge value={s.energy} />
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
@@ -746,10 +768,15 @@ const PROSE = 'font-roboto text-[13px] leading-7 text-[var(--text-secondary)] [&
 function VideoSlice({ video }: { video: { id: string; start: number; end: number; label?: string } }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const playerRef = useRef<any>(null)
+  const seekRef = useRef<HTMLDivElement | null>(null)
   const [started, setStarted] = useState(false)
   const [ready, setReady] = useState(false)
   const [playing, setPlaying] = useState(false)
+  const [muted, setMuted] = useState(false)
   const [progress, setProgress] = useState(0)
+
+  const span = Math.max(1, video.end - video.start)
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
   const ensureApi = (cb: () => void) => {
     const w = window as any
@@ -771,10 +798,20 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
       const w = window as any
       playerRef.current = new w.YT.Player(hostRef.current, {
         videoId: video.id,
-        playerVars: { start: video.start, end: video.end, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3 },
+        playerVars: { start: video.start, end: video.end, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, fs: 0, cc_load_policy: 0 },
         events: {
-          onReady: (e: any) => { setReady(true); e.target.seekTo(video.start, true) },
-          onStateChange: (e: any) => setPlaying(e.data === 1),
+          onReady: (e: any) => {
+            setReady(true)
+            try {
+              const f = e.target.getIframe()
+              if (f) { f.style.position = 'absolute'; f.style.top = '-9%'; f.style.left = '-4%'; f.style.width = '108%'; f.style.height = '118%'; f.style.pointerEvents = 'none' }
+            } catch { /* ignore */ }
+            e.target.seekTo(video.start, true)
+          },
+          onStateChange: (e: any) => {
+            if (e.data === 0) { e.target.seekTo(video.start, true); e.target.pauseVideo(); setProgress(0); setPlaying(false) }
+            else setPlaying(e.data === 1)
+          },
         },
       })
     })
@@ -786,54 +823,99 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
       const p = playerRef.current
       if (!p || typeof p.getCurrentTime !== 'function') return
       const t = p.getCurrentTime()
-      // keep the playhead inside [start, end]: no rewinding before, no skipping past
       if (t < video.start - 0.75) p.seekTo(video.start, true)
-      if (t >= video.end - 0.2) { p.pauseVideo(); p.seekTo(video.end - 0.1, true) }
-      const span = Math.max(1, video.end - video.start)
+      if (t >= video.end - 0.15) {
+        // stop just before the end so YouTube's end screen never appears
+        p.pauseVideo()
+        p.seekTo(video.start, true)
+        setProgress(0)
+        return
+      }
       setProgress(Math.max(0, Math.min(1, (t - video.start) / span)))
-    }, 250)
+    }, 200)
     return () => window.clearInterval(id)
-  }, [started, ready, video.start, video.end])
+  }, [started, ready, video.start, video.end, span])
 
   const toggle = () => {
     const p = playerRef.current
     if (!p) return
     if (playing) { p.pauseVideo(); return }
     const t = p.getCurrentTime()
-    if (t >= video.end - 0.5 || t < video.start) p.seekTo(video.start, true)
+    if (t < video.start || t >= video.end - 0.5) p.seekTo(video.start, true)
     p.playVideo()
   }
 
-  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+  const toggleMute = () => {
+    const p = playerRef.current
+    if (!p) return
+    if (muted) { p.unMute(); setMuted(false) } else { p.mute(); setMuted(true) }
+  }
+
+  const seekTo = (clientX: number) => {
+    const el = seekRef.current
+    const p = playerRef.current
+    if (!el || !p) return
+    const r = el.getBoundingClientRect()
+    const frac = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)))
+    p.seekTo(video.start + frac * span, true)
+    setProgress(frac)
+  }
 
   if (!started) {
     return (
-      <button
-        onClick={begin}
-        className="relative block w-full overflow-hidden cursor-pointer bg-transparent p-0"
-        style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }}
-        title={video.label || 'Play lesson clip'}
-      >
+      <button onClick={begin} className="relative block w-full overflow-hidden cursor-pointer bg-transparent p-0" style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }} title={video.label || 'Play lesson clip'}>
         <img src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.6 }} />
-        <span className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(180deg, rgba(4,7,12,0.15), rgba(4,7,12,0.72))' }}>
-          <span className="flex items-center justify-center w-11 h-11 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 88%, transparent)', color: '#04070c', fontSize: 15 }}>▶</span>
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(180deg, rgba(4,7,12,0.15), rgba(4,7,12,0.78))' }}>
+          <span className="flex items-center justify-center w-12 h-12 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 90%, transparent)', color: '#04070c', fontSize: 16, boxShadow: '0 0 24px color-mix(in oklab, var(--color-primary) 45%, transparent)' }}>▶</span>
           <span className="font-mono text-[9px] tracking-[0.14em] px-2 text-center" style={{ color: 'var(--text-secondary)' }}>WATCH · {video.label || 'LESSON CLIP'}</span>
+          <span className="font-mono text-[8px]" style={{ color: 'var(--text-muted)' }}>{clock(video.start)} – {clock(video.end)}</span>
         </span>
       </button>
     )
   }
 
   return (
-    <div className="relative w-full overflow-hidden" style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)', background: '#000' }}>
-      <div ref={hostRef} className="absolute inset-0 w-full h-full" />
-      {/* blocks the YouTube title / logo click-through */}
-      <div className="absolute inset-x-0 top-0 h-[64px] cursor-pointer" onClick={toggle} />
-      <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 px-2 py-1.5" style={{ background: 'linear-gradient(0deg, rgba(0,0,0,0.82), transparent)' }}>
-        <button onClick={toggle} className="micro">{playing ? '❚❚' : '▶'}</button>
-        <span className="flex-1 h-[3px] overflow-hidden" style={{ background: 'rgba(255,255,255,0.18)' }}>
-          <i className="block h-full" style={{ width: `${progress * 100}%`, background: 'var(--color-primary)' }} />
-        </span>
-        <span className="font-mono text-[9px]" style={{ color: 'var(--text-secondary)' }}>{clock(video.start + progress * (video.end - video.start))} / {clock(video.end)}</span>
+    <div className="relative w-full overflow-hidden select-none" style={{ aspectRatio: '16 / 9', background: '#000', border: '1px solid var(--border)' }}>
+      <div ref={hostRef} className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }} />
+
+      {/* full click surface blocks YouTube's own controls/title */}
+      <div className="absolute inset-0 cursor-pointer" onClick={toggle} />
+
+      {/* paused veil hides YouTube's pause + end-screen UI */}
+      {!playing && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ background: 'var(--surface)' }}>
+          <span className="flex items-center justify-center w-14 h-14 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 90%, transparent)', color: '#04070c', fontSize: 20, boxShadow: '0 0 28px color-mix(in oklab, var(--color-primary) 50%, transparent)' }}>▶</span>
+        </div>
+      )}
+
+      {/* top chrome */}
+      <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-3 pointer-events-none" style={{ height: 46, background: 'var(--surface)' }}>
+        <span className="font-mono text-[9px] tracking-[0.12em] truncate" style={{ color: 'var(--text-secondary)' }}>{video.label || 'LESSON CLIP'}</span>
+        <span className="font-mono text-[8px] shrink-0" style={{ color: 'var(--text-muted)' }}>{clock(video.start)}–{clock(video.end)}</span>
+      </div>
+
+      {/* bottom controls */}
+      <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2 pt-3" style={{ background: 'var(--surface)' }} onClick={e => e.stopPropagation()}>
+        <div
+          ref={seekRef}
+          className="relative h-[4px] mb-2 cursor-pointer"
+          style={{ background: 'rgba(255,255,255,0.18)' }}
+          onPointerDown={e => { e.stopPropagation(); seekTo(e.clientX) }}
+          onPointerMove={e => { if (e.buttons === 1) seekTo(e.clientX) }}
+        >
+          <span className="absolute inset-y-0 left-0" style={{ width: `${Math.min(100, progress * 100)}%`, background: 'var(--color-primary)' }} />
+          <span className="absolute top-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full" style={{ left: `calc(${Math.min(100, progress * 100)}% - 4px)`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 60%, transparent)' }} />
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={e => { e.stopPropagation(); toggle() }} className="grid place-items-center w-7 h-7 cursor-pointer" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 14%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)' }}>
+            {playing ? '❚❚' : '▶'}
+          </button>
+          <button onClick={e => { e.stopPropagation(); toggleMute() }} className="grid place-items-center w-7 h-7 cursor-pointer font-mono text-[10px]" style={{ color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border)' }}>
+            {muted ? '🔇' : '🔊'}
+          </button>
+          <span className="flex-1" />
+          <span className="font-mono text-[9px]" style={{ color: 'var(--text-secondary)' }}>{clock(video.start + progress * span)} <span style={{ color: 'var(--text-muted)' }}>/ {clock(video.end)}</span></span>
+        </div>
       </div>
     </div>
   )
@@ -1357,11 +1439,12 @@ export default function App() {
   const agent = useAgent()
   const live = useLiveRoom()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const meId = live.room?.meId || null
   const roster: ScoreRow[] = live.room?.members?.length
-    ? live.room.members.map(m => ({ id: m.id, name: m.name, lang: m.lang, score: m.score ?? null, host: m.host, connected: m.connected }))
+    ? live.room.members.map(m => ({ id: m.id, name: m.name, lang: m.lang, score: m.score ?? null, host: m.host, connected: m.connected, me: m.id === meId }))
     : [
-        { id: 'me', name: s.me.name || 'YOU', lang: s.me.lang, score: s.me.score, host: true, connected: true },
-        ...(s.opp.joined ? [{ id: 'opp', name: s.opp.name, lang: s.opp.lang, score: s.opp.score, host: false, connected: s.opp.connected }] : []),
+        { id: 'me', name: s.me.name || 'YOU', lang: s.me.lang, score: s.me.score, host: true, connected: true, me: true },
+        ...(s.opp.joined ? [{ id: 'opp', name: s.opp.name, lang: s.opp.lang, score: s.opp.score, host: false, connected: s.opp.connected, me: false }] : []),
       ]
   useSoundReactions(s, sfx)
   useGlobalSfx(sfx)
