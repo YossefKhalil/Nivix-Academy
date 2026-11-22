@@ -29,32 +29,44 @@ function Chip({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted
 }
 
 function SegTabs({ value, onChange, items }: { value: string; onChange: (v: string) => void; items: { id: string; label: string }[] }) {
+  const n = Math.max(1, items.length)
+  const idx = Math.max(0, items.findIndex(i => i.id === value))
   return (
     <div
-      className="inline-flex items-stretch gap-1 p-0.5"
+      className="relative inline-flex overflow-hidden"
       style={{
-        background: 'color-mix(in oklab, var(--surface) 88%, black)',
-        boxShadow: 'inset 0 0 0 1px var(--border)',
-        clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%)',
+        width: 300,
+        border: '1px solid var(--border)',
+        background: 'color-mix(in oklab, var(--surface) 94%, black)',
+        clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)',
       }}
     >
-      {items.map(it => {
+      <span
+        aria-hidden
+        className="absolute top-0 bottom-0 transition-all duration-300 ease-out"
+        style={{
+          left: `${(100 / n) * idx}%`,
+          width: `${100 / n}%`,
+          background: 'linear-gradient(180deg, color-mix(in oklab, var(--color-primary) 28%, transparent), color-mix(in oklab, var(--color-primary) 8%, transparent))',
+          boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 50%, transparent), 0 0 18px color-mix(in oklab, var(--color-primary) 22%, transparent)',
+          clipPath: 'polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%)',
+        }}
+      />
+      {items.map((it, i) => {
         const active = value === it.id
         return (
           <button
             key={it.id}
             onClick={() => onChange(it.id)}
-            className="relative font-orbitron font-bold text-[10px] tracking-[0.12em] px-3.5 py-1.5 cursor-pointer transition-all"
-            style={{
-              color: active ? '#04070c' : 'var(--text-secondary)',
-              background: active ? 'linear-gradient(180deg, #cfe8ff, var(--color-primary))' : 'transparent',
-              boxShadow: active ? '0 0 16px color-mix(in oklab, var(--color-primary) 45%, transparent), inset 0 0 0 1px #e6f3ff' : 'none',
-              clipPath: 'polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%)',
-            }}
-            onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'color-mix(in oklab, var(--color-primary) 10%, transparent)' }}
-            onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+            className="relative z-[1] flex-1 font-mono text-[10px] tracking-[0.12em] py-[7px] cursor-pointer"
+            style={{ color: active ? 'var(--color-primary)' : 'var(--text-muted)' }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
           >
-            {it.label}
+            <span className="inline-flex items-center gap-1.5">
+              <span className="font-orbitron text-[9px]" style={{ color: active ? 'var(--color-primary)' : 'var(--text-muted)' }}>{String(i + 1).padStart(2, '0')}</span>
+              {it.label}
+            </span>
           </button>
         )
       })}
@@ -797,9 +809,72 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
 const PROSE = 'font-roboto text-[13px] leading-7 text-[var(--text-secondary)] [&_p]:my-3 [&_p]:text-[var(--text-muted)] [&_ul]:pl-5 [&_ul]:list-disc [&_li]:my-1.5 [&_li]:text-[var(--text-muted)] [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-primary [&_code]:px-1 [&_code]:bg-[rgba(111,159,245,0.10)]'
 
 function VideoSlice({ video }: { video: { id: string; start: number; end: number; label?: string; src?: string } }) {
-  const [nonce, setNonce] = useState(0)
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  const playerRef = useRef<any>(null)
+  const seekRef = useRef<HTMLDivElement | null>(null)
   const [started, setStarted] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [current, setCurrent] = useState(video.start)
+
+  const span = Math.max(1, video.end - video.start)
   const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+  const ensureApi = (cb: () => void) => {
+    const w = window as any
+    if (w.YT && w.YT.Player) { cb(); return }
+    if (!document.getElementById('yt-iframe-api')) {
+      const s = document.createElement('script')
+      s.id = 'yt-iframe-api'
+      s.src = 'https://www.youtube.com/iframe_api'
+      document.body.appendChild(s)
+    }
+    const prev = w.onYouTubeIframeAPIReady
+    w.onYouTubeIframeAPIReady = () => { if (prev) prev(); cb() }
+  }
+
+  const begin = () => {
+    setStarted(true)
+    ensureApi(() => {
+      if (!hostRef.current || playerRef.current) return
+      const w = window as any
+      playerRef.current = new w.YT.Player(hostRef.current, {
+        videoId: video.id,
+        playerVars: { start: video.start, end: video.end, controls: 1, rel: 0, modestbranding: 1, playsinline: 1 },
+        events: { onReady: (e: any) => { setReady(true); e.target.seekTo(video.start, true) } },
+      })
+    })
+  }
+
+  useEffect(() => {
+    if (!started || !ready) return
+    const id = window.setInterval(() => {
+      const p = playerRef.current
+      if (!p || typeof p.getCurrentTime !== 'function') return
+      const t = p.getCurrentTime()
+      setCurrent(t)
+      setProgress(Math.max(0, Math.min(1, (t - video.start) / span)))
+    }, 300)
+    return () => window.clearInterval(id)
+  }, [started, ready, video.start, span])
+
+  const seekTo = (clientX: number) => {
+    const el = seekRef.current
+    const p = playerRef.current
+    if (!el || !p) return
+    const r = el.getBoundingClientRect()
+    const frac = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)))
+    p.seekTo(video.start + frac * span, true)
+    setProgress(frac)
+    setCurrent(video.start + frac * span)
+  }
+
+  const restart = () => {
+    const p = playerRef.current
+    if (!p) return
+    p.seekTo(video.start, true)
+    p.playVideo()
+  }
 
   if (video.src) {
     return (
@@ -811,7 +886,7 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
 
   if (!started) {
     return (
-      <button onClick={() => setStarted(true)} className="relative block w-full overflow-hidden cursor-pointer bg-transparent p-0" style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }} title={video.label || 'Play lesson clip'}>
+      <button onClick={begin} className="relative block w-full overflow-hidden cursor-pointer bg-transparent p-0" style={{ aspectRatio: '16 / 9', border: '1px solid var(--border)' }} title={video.label || 'Play lesson clip'}>
         <img src={`https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.6 }} />
         <span className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(180deg, rgba(4,7,12,0.15), rgba(4,7,12,0.78))' }}>
           <span className="flex items-center justify-center w-12 h-12 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-primary) 90%, transparent)', color: '#04070c', fontSize: 16, boxShadow: '0 0 24px color-mix(in oklab, var(--color-primary) 45%, transparent)' }}>▶</span>
@@ -822,24 +897,30 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
     )
   }
 
-  const src = `https://www.youtube.com/embed/${video.id}?start=${video.start}&end=${video.end}&rel=0&modestbranding=1&playsinline=1${nonce ? '&autoplay=1' : ''}`
   return (
     <div className="flex flex-col overflow-hidden" style={{ border: '1px solid var(--border)' }}>
       <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000' }}>
-        <iframe
-          key={nonce}
-          src={src}
-          title={video.label || 'Lesson clip'}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
-        />
+        <div ref={hostRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
       </div>
-      <div className="flex items-center gap-2 px-2.5 py-2" style={{ background: 'var(--surface-raised)', borderTop: '1px solid var(--border)' }}>
-        <span className="font-mono text-[9px] tracking-[0.12em] truncate" style={{ color: 'var(--text-muted)' }}>{(video.label || 'CLIP').toUpperCase()}</span>
-        <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)' }}>{clock(video.start)} – {clock(video.end)}</span>
-        <span className="flex-1" />
-        <button onClick={() => setNonce(n => n + 1)} className="micro shrink-0">⟲ RESTART SLICE</button>
+      <div className="px-2.5 py-2 flex flex-col gap-1.5" style={{ background: 'var(--surface-raised)', borderTop: '1px solid var(--border)' }}>
+        <div
+          ref={seekRef}
+          className="relative h-[6px] cursor-pointer"
+          style={{ background: 'color-mix(in oklab, var(--border) 80%, transparent)' }}
+          onPointerDown={e => { e.stopPropagation(); seekTo(e.clientX) }}
+          onPointerMove={e => { if (e.buttons === 1) seekTo(e.clientX) }}
+          title="seek within the slice"
+        >
+          <span className="absolute inset-y-0 left-0" style={{ width: `${progress * 100}%`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 55%, transparent)' }} />
+          <span className="absolute top-1/2 -translate-y-1/2 w-[10px] h-[10px] rounded-full" style={{ left: `calc(${progress * 100}% - 5px)`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 60%, transparent)' }} />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[9px] tracking-[0.12em] truncate" style={{ color: 'var(--text-muted)' }}>{(video.label || 'CLIP').toUpperCase()}</span>
+          <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)' }}>{clock(video.start)} – {clock(video.end)}</span>
+          <span className="flex-1" />
+          <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{clock(Math.max(video.start, Math.min(video.end, current)))} <span style={{ color: 'var(--text-muted)' }}>/ {clock(video.end)}</span></span>
+          <button onClick={restart} className="micro shrink-0">⟲ RESTART</button>
+        </div>
       </div>
     </div>
   )
