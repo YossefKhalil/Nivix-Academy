@@ -457,7 +457,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
           clipPath: 'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
         }}
       >
-        VS
+        {others.length === 0 ? 'SOLO' : 'VS'}
       </span>
 
       {/* right - opponent + vitals */}
@@ -465,7 +465,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
         <div className="flex items-center gap-2 min-w-0">
           {opponent
             ? <ScoreCard row={opponent} total={total} />
-            : <span className="font-orbitron text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>WAITING…</span>}
+            : <span className="font-orbitron text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{others.length === 0 ? 'SOLO RUN' : 'WAITING…'}</span>}
           {extra > 0 && (
             <span className="grid place-items-center h-[24px] px-2 font-mono text-[9px]" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)' }}>+{extra}</span>
           )}
@@ -632,14 +632,8 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
   const canStart = members.length >= 1
 
   const doSolo = async () => {
-    setNote(null); setBusy(true)
-    try {
-      if (agent && live.connected) {
-        const r = await createRoom({ mode: 'single', maxPlayers: 1 })
-        if (!r?.ok) { setNote(r?.error || 'could not start solo'); return }
-      }
-      send({ type: 'CREATE_ROOM' })
-    } finally { setBusy(false) }
+    setNote(null)
+    send({ type: 'START_SOLO' })
   }
 
   const doHost = async () => {

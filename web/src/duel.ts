@@ -107,14 +107,6 @@ function tick(s: State) {
   if (s.screen !== 'match') return
   s.elapsed++
   if (s.elapsed % RECHARGE_SEC === 0) s.energy = Math.min(ENERGY_MAX, s.energy + 1)
-  if (!s.opp.submitted && s.opp.connected) {
-    s.oppTick++
-    if (s.oppTick % 30 === 0) {
-      if (s.opp.stage < 4) { s.opp.stage++; sys(s.chat, s.opp.name + ' REACHED STAGE ' + s.opp.stage + '/4') }
-      else { s.opp.submitted = true; sys(s.chat, s.opp.name + ' SUBMITTED') }
-    }
-  }
-  maybeResolve(s)
 }
 export function aiAnswer(q: string) {
   const t = q.toLowerCase()
@@ -141,6 +133,7 @@ export function reduce(s0: State, a: Action): State {
     case 'TOGGLE_READY': s.me.ready = !s.me.ready; sys(s.chat, 'YOU ' + (s.me.ready ? 'READY' : 'STOOD DOWN')); break
     case 'OPP_READY': s.opp.ready = true; sys(s.chat, s.opp.name + ' READY'); break
     case 'START': s.screen = 'countdown'; s.countdown = 3; break
+    case 'START_SOLO': s.role = null; s.opp.joined = false; s.round = 1; s.rounds = []; s.chat = []; s.screen = 'countdown'; s.countdown = 3; break
     case 'LEAVE': s.role = null; s.screen = 'lobby'; break
     case 'COUNT': s.countdown = Math.max(0, s.countdown - 1); break
     case 'MATCH_BEGIN': startRound(s); break
