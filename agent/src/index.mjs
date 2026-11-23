@@ -475,43 +475,12 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      if (url.pathname === '/api/wiki' && req.method === 'GET') {
-        const q = url.searchParams.get('q') || ''
-        if (!q) return sendJson(res, 400, { ok: false, error: 'q required' })
-        const { key, base: rawBase, path: searchPath } = context7Config()
-        const base = rawBase.replace(/\/$/, '')
-        if (!key) return sendJson(res, 503, { ok: false, error: 'Context7 offline: set CONTEXT7_API_KEY in agent/.env' })
-        try {
-          const u = new URL(`${base}${searchPath}`)
-          u.searchParams.set('query', q)
-          u.searchParams.set('libraryName', q)
-          const r = await fetch(u, { headers: { authorization: `Bearer ${key}`, 'x-context7-api-key': key } })
-          const text = await r.text()
-          let j = null
-          try { j = text ? JSON.parse(text) : null } catch { j = null }
-          if (!r.ok) return sendJson(res, 502, { ok: false, error: (j && (j.message || j.error)) || `Context7 HTTP ${r.status}` })
-          const raw = j?.results || j?.data || j?.libraries || []
-          const results = (Array.isArray(raw) ? raw : []).slice(0, 8).map((x) => {
-            const id = String(x.id || x.libraryId || '').replace(/^\/+/, '')
-            return {
-              title: x.title || x.name || x.id || 'result',
-              url: x.url || (id ? `https://context7.com/${id}` : ''),
-              source: x.trustScore != null ? `trust ${x.trustScore}` : (x.source || x.provider || 'context7'),
-            }
-          })
-          return sendJson(res, 200, { ok: true, results })
-        } catch (e) {
-          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
-        }
-      }
 
       if (url.pathname === '/api/keys' && req.method === 'GET') {
         const ai = aiConfig()
-        const c7 = context7Config()
         return sendJson(res, 200, {
           ok: true,
           openaiSet: !!ai.key, openaiBase: ai.base, openaiModel: ai.model,
-          context7Set: !!c7.key,
           relayUrl: config.read().relayUrl || '',
         })
       }

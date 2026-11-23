@@ -1480,13 +1480,12 @@ function Settings({ onClose }: { onClose: () => void }) {
   const [openaiKey, setOpenaiKey] = useState('')
   const [openaiBase, setOpenaiBase] = useState('')
   const [openaiModel, setOpenaiModel] = useState('')
-  const [context7Key, setContext7Key] = useState('')
   const [relayUrl, setRelayUrl] = useState('')
   const [keyNote, setKeyNote] = useState<string | null>(null)
   useEffect(() => { getKeys().then(k => { if (k) { setKeys(k); setOpenaiBase(k.openaiBase || ''); setOpenaiModel(k.openaiModel || ''); setRelayUrl(k.relayUrl || '') } }) }, [])
   const saveKeysNow = async () => {
-    const r = await saveKeys({ openaiKey, openaiBase, openaiModel, context7Key, relayUrl })
-    if (r?.ok) { setOpenaiKey(''); setContext7Key(''); setKeys(await getKeys()); setKeyNote('saved') }
+    const r = await saveKeys({ openaiKey, openaiBase, openaiModel, relayUrl })
+    if (r?.ok) { setOpenaiKey(''); setKeys(await getKeys()); setKeyNote('saved') }
     else setKeyNote(r?.error || 'could not save')
   }
 
@@ -1526,14 +1525,13 @@ function Settings({ onClose }: { onClose: () => void }) {
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>API KEYS</span>
-              <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>NIVIX {keys?.openaiSet ? 'ON' : 'OFF'} · WIKI {keys?.context7Set ? 'ON' : 'OFF'}</span>
+              <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>NIVIX {keys?.openaiSet ? 'ON' : 'OFF'}</span>
             </div>
             <input value={openaiKey} onChange={e => setOpenaiKey(e.target.value)} type="password" placeholder={keys?.openaiSet ? 'OpenAI key (saved)' : 'OpenAI-compatible API key'} className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
             <div className="grid grid-cols-2 gap-2">
               <input value={openaiBase} onChange={e => setOpenaiBase(e.target.value)} placeholder="base URL" className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
               <input value={openaiModel} onChange={e => setOpenaiModel(e.target.value)} placeholder="model" className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
             </div>
-            <input value={context7Key} onChange={e => setContext7Key(e.target.value)} type="password" placeholder={keys?.context7Set ? 'Context7 key (saved)' : 'Context7 API key'} className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
             <input value={relayUrl} onChange={e => setRelayUrl(e.target.value)} placeholder="relay URL (online mode)" className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
             <div className="flex items-center gap-2">
               <button onClick={saveKeysNow} className="micro">SAVE KEYS</button>
