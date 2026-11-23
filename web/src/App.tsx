@@ -29,35 +29,27 @@ function Chip({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted
 }
 
 function SegTabs({ value, onChange, items }: { value: string; onChange: (v: string) => void; items: { id: string; label: string }[] }) {
-  const corner = (style: CSSProperties) => ({ position: 'absolute', width: 8, height: 8, ...style } as CSSProperties)
   return (
-    <div className="relative inline-flex items-stretch">
-      <span aria-hidden style={corner({ top: -1, left: -1, borderTop: '1px solid var(--color-primary)', borderLeft: '1px solid var(--color-primary)' })} />
-      <span aria-hidden style={corner({ top: -1, right: -1, borderTop: '1px solid var(--color-primary)', borderRight: '1px solid var(--color-primary)' })} />
-      <span aria-hidden style={corner({ bottom: -1, left: -1, borderBottom: '1px solid var(--color-primary)', borderLeft: '1px solid var(--color-primary)' })} />
-      <span aria-hidden style={corner({ bottom: -1, right: -1, borderBottom: '1px solid var(--color-primary)', borderRight: '1px solid var(--color-primary)' })} />
-      <div className="inline-flex items-stretch" style={{ border: '1px solid var(--border)', background: 'color-mix(in oklab, var(--surface) 92%, black)' }}>
-        {items.map((it, i) => {
-          const active = value === it.id
-          return (
-            <button
-              key={it.id}
-              onClick={() => onChange(it.id)}
-              className="relative font-mono text-[9px] tracking-[0.16em] px-3 py-[5px] cursor-pointer transition-colors"
-              style={{
-                color: active ? 'var(--color-primary)' : 'var(--text-muted)',
-                background: active ? 'color-mix(in oklab, var(--color-primary) 6%, transparent)' : 'transparent',
-                borderLeft: i ? '1px solid var(--border)' : undefined,
-                textShadow: active ? '0 0 8px color-mix(in oklab, var(--color-primary) 45%, transparent)' : undefined,
-              }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
-            >
-              {it.label}
-            </button>
-          )
-        })}
-      </div>
+    <div className="inline-flex items-center gap-0.5 p-0.5" style={{ background: 'color-mix(in oklab, var(--surface) 90%, black)', border: '1px solid var(--border)' }}>
+      {items.map(it => {
+        const active = value === it.id
+        return (
+          <button
+            key={it.id}
+            onClick={() => onChange(it.id)}
+            className="font-mono text-[9px] tracking-[0.14em] px-2.5 py-1 cursor-pointer transition-colors"
+            style={{
+              color: active ? 'var(--color-primary)' : 'var(--text-muted)',
+              background: active ? 'color-mix(in oklab, var(--color-primary) 14%, transparent)' : 'transparent',
+              borderRadius: 3,
+            }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
+          >
+            {it.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -406,7 +398,7 @@ function ScoreDropdown({ roster }: { roster: ScoreRow[] }) {
   )
 }
 
-function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; roster: ScoreRow[] }) {
+function Hud({ s, onSettings, roster, multiplayer }: { s: State; onSettings: () => void; roster: ScoreRow[]; multiplayer: boolean }) {
   const total = ROUNDS[s.round - 1].tests.length
   const me = roster.find(p => p.me) || roster[0] || { id: 'me', name: s.me.name || 'YOU', lang: s.me.lang, score: s.me.score, me: true }
   const meRow = { ...me, score: s.me.score ?? me.score, stage: s.me.stage }
@@ -434,8 +426,8 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
         <ScoreCard row={meRow} you total={total} />
       </div>
 
-      {/* centre - VS (only when there is an opponent) */}
-      {others.length > 0 && (
+      {/* centre - VS (fixed slot keeps the grid balanced) */}
+      {multiplayer ? (
         <span
           className="grid place-items-center w-[40px] h-[28px] font-orbitron font-bold text-[11px] tracking-[0.16em]"
           style={{
@@ -447,12 +439,16 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
         >
           VS
         </span>
+      ) : (
+        <span aria-hidden className="w-[40px] h-[28px]" />
       )}
 
       {/* right - opponent + vitals */}
       <div className="flex items-center justify-between gap-4 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          {others.length > 0 && opponent && <ScoreCard row={opponent} total={total} />}
+          {multiplayer && (opponent
+            ? <ScoreCard row={opponent} total={total} />
+            : <span className="font-orbitron text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>WAITING...</span>)}
           {extra > 0 && (
             <span className="grid place-items-center h-[24px] px-2 font-mono text-[9px]" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)' }}>+{extra}</span>
           )}
@@ -462,7 +458,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
           <span className="font-mono text-[13px] tracking-[0.06em]" style={{ fontVariantNumeric: 'tabular-nums', minWidth: 52, textAlign: 'right' }}>{fmt(s.elapsed)}</span>
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
-          {others.length > 0 && <ScoreDropdown roster={roster} />}
+          {multiplayer && <ScoreDropdown roster={roster} />}
           <button onClick={onSettings} title="settings" className="relative cursor-pointer bg-transparent border-0 text-[13px] leading-none" style={{ color: 'var(--text-secondary)' }}>⚙</button>
         </div>
       </div>
@@ -1345,10 +1341,10 @@ function Tester({ s, send }: { s: State; send: Send }) {
   )
 }
 
-function Match({ s, send, onSettings, roster }: { s: State; send: Send; onSettings: () => void; roster: ScoreRow[] }) {
+function Match({ s, send, onSettings, roster, multiplayer }: { s: State; send: Send; onSettings: () => void; roster: ScoreRow[]; multiplayer: boolean }) {
   return (
     <>
-      <Hud s={s} onSettings={onSettings} roster={roster} />
+      <Hud s={s} onSettings={onSettings} roster={roster} multiplayer={multiplayer} />
       <div className="flex-1 grid min-h-0 gap-2 p-2" style={{ gridTemplateColumns: '44% 1fr' }}>
         <section className="grid min-h-0 gap-2" style={{ gridTemplateRows: '1fr 260px' }}>
           <Brief key={`b${s.round}`} s={s} send={send} />
@@ -1633,7 +1629,7 @@ export default function App() {
 
         <div className="relative z-10 flex-1 min-h-0 flex flex-col">
           {s.screen === 'lobby' && <Lobby s={s} send={send} agent={agent} onSettings={() => setSettingsOpen(true)} live={live} />}
-          {s.screen === 'match' && <Match s={s} send={send} onSettings={() => setSettingsOpen(true)} roster={roster} />}
+          {s.screen === 'match' && <Match s={s} send={send} onSettings={() => setSettingsOpen(true)} roster={roster} multiplayer={!!live.room?.code} />}
           {s.screen === 'matchResult' && <Final s={s} send={send} />}
           {s.screen === 'countdown' && <Countdown s={s} />}
           {s.screen === 'roundResult' && <RoundResult s={s} send={send} />}
