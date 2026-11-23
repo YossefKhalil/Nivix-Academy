@@ -56,6 +56,29 @@ function SegTabs({ value, onChange, items }: { value: string; onChange: (v: stri
   )
 }
 
+/** Compact ONLINE / LAN switch used on the HOST and JOIN windows. */
+function NetToggle({ value, onChange }: { value: 'online' | 'lan'; onChange: (v: 'online' | 'lan') => void }) {
+  return (
+    <div className="inline-flex items-stretch overflow-hidden shrink-0" style={{ border: '1px solid var(--border)', borderRadius: 3, background: 'color-mix(in oklab, var(--surface-raised) 60%, transparent)' }}>
+      {(['online', 'lan'] as const).map((m, i) => {
+        const active = value === m
+        return (
+          <button
+            key={m}
+            onClick={() => onChange(m)}
+            className="font-mono text-[9px] tracking-[0.14em] px-2 py-1 cursor-pointer transition-colors"
+            style={{
+              color: active ? 'var(--color-primary)' : 'var(--text-muted)',
+              background: active ? 'color-mix(in oklab, var(--color-primary) 14%, transparent)' : 'transparent',
+              borderLeft: i ? '1px solid var(--border)' : undefined,
+            }}
+          >{m === 'online' ? 'ONLINE' : 'LAN'}</button>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ── window header (shared by BRIEF / SUPPORT / WORKSPACE / TESTER) ── */
 
 function PanelHead({ title, left, right }: { title: string; left?: ReactNode; right?: ReactNode }) {
@@ -711,52 +734,35 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
 
           {!inRoom ? (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
                   <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>PLAY SOLO</span>
                   <p className="font-roboto text-[13px] leading-6" style={{ color: 'var(--text-muted)' }}>Practise alone. Judge your server, keep your score.</p>
                   <div className="mt-auto"><Button shape="flat" className="!mb-0 !px-5 !py-1.5" disabled={busy} onClick={doSolo}>START SOLO</Button></div>
                 </GameCard>
 
-                <GameCard bodyClassName="flex flex-col h-full">
-                  <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2.5">
-                    <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>MULTIPLAYER</span>
-                    <div className="inline-flex items-stretch overflow-hidden" style={{ border: '1px solid var(--border)', borderRadius: 3, background: 'color-mix(in oklab, var(--surface-raised) 60%, transparent)' }}>
-                      {(['online', 'lan'] as const).map((m, i) => {
-                        const active = netMode === m
-                        return (
-                          <button
-                            key={m}
-                            onClick={() => setNetMode(m)}
-                            className="font-mono text-[9px] tracking-[0.14em] px-2.5 py-1 cursor-pointer transition-colors"
-                            style={{
-                              color: active ? 'var(--color-primary)' : 'var(--text-muted)',
-                              background: active ? 'color-mix(in oklab, var(--color-primary) 14%, transparent)' : 'transparent',
-                              borderLeft: i ? '1px solid var(--border)' : undefined,
-                            }}
-                          >{m === 'online' ? 'ONLINE' : 'LAN'}</button>
-                        )
-                      })}
-                    </div>
+                <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>HOST ROOM</span>
+                    <NetToggle value={netMode} onChange={setNetMode} />
                   </div>
-                  <div className="px-5 font-mono text-[8px] tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>{netMode === 'online' ? 'via relay - players join from anywhere' : 'same network only'}</div>
-                  <div className="grid grid-cols-2 gap-4 px-5 py-4 mt-auto" style={{ borderTop: '1px solid var(--border)' }}>
-                    <div className="flex flex-col gap-2.5">
-                      <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>HOST</span>
-                      <Button shape="flat" className="!mb-0 !px-4 !py-1.5" disabled={busy} onClick={doHost}>{busy ? 'WORKING...' : 'CREATE ROOM'}</Button>
-                    </div>
-                    <div className="flex flex-col gap-2.5">
-                      <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>JOIN</span>
-                      <input
-                        value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                        onKeyDown={e => { if (e.key === 'Enter' && joinCode) doJoin() }}
-                        placeholder="CODE" maxLength={6}
-                        className="font-mono text-[15px] tracking-[0.28em] text-center uppercase px-2 py-1.5 border bg-transparent outline-none"
-                        style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-                      />
-                      <Button shape="flat" variant="secondary" className="!mb-0 !px-4 !py-1.5" disabled={busy || joinCode.length < 4} onClick={doJoin}>JOIN</Button>
-                    </div>
+                  <p className="font-roboto text-[13px] leading-6" style={{ color: 'var(--text-muted)' }}>{netMode === 'online' ? 'Open a room; players join from anywhere with the code.' : 'Open a room on your network; share the IP and code.'}</p>
+                  <div className="mt-auto"><Button shape="flat" className="!mb-0 !px-5 !py-1.5" disabled={busy} onClick={doHost}>{busy ? 'WORKING...' : 'CREATE ROOM'}</Button></div>
+                </GameCard>
+
+                <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>JOIN ROOM</span>
+                    <NetToggle value={netMode} onChange={setNetMode} />
                   </div>
+                  <input
+                    value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === 'Enter' && joinCode) doJoin() }}
+                    placeholder="CODE" maxLength={6}
+                    className="font-mono text-[16px] tracking-[0.28em] text-center uppercase px-2 py-2 border bg-transparent outline-none"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                  />
+                  <div className="mt-auto"><Button shape="flat" variant="secondary" className="!mb-0 !px-5 !py-1.5" disabled={busy || joinCode.length < 4} onClick={doJoin}>JOIN</Button></div>
                 </GameCard>
               </div>
 
