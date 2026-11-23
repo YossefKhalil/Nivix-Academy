@@ -7,6 +7,10 @@ web/dist/
 web/node_modules/.vite/
 *.tsbuildinfo
 
+# packaged executable
+dist/
+agent/build/
+
 # agent runtime
 agent/workspace/**/bin/
 agent/workspace/**/obj/

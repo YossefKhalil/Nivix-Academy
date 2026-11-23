@@ -89,3 +89,27 @@ transport falls back to plain TCP on the LAN.
 - ✅ Agent: UI serving, server supervision, judge (rounds 1–2), editor launch, ZeroTier detection, peer relay
 - ⏳ Frontend networked state sync against the agent
 - ⏳ Phase 3: study material, content pipeline, seasons/replay
+## Build a standalone executable
+
+Requirements: Node 22+ and an internet connection (pkg downloads a base Node binary).
+
+```
+# 1. build the UI
+cd web && npm run build && cd ..
+
+# 2. bundle the agent to a single CommonJS file
+cd agent
+npx esbuild src/index.mjs --bundle --platform=node --format=cjs --target=node20 `
+  --outfile=build/agent.cjs --external:libzt --external:bufferutil --external:utf-8-validate
+cd ..
+
+# 3. package the exe (run from the repo root so assets resolve)
+node agent/node_modules/@yao-pkg/pkg/lib-es5/bin.js agent/build/agent.cjs `
+  -c pkg.config.json --targets node24-win-x64 --fallback-to-source --output dist/NivixAcademy.exe
+```
+
+`dist/NivixAcademy.exe` embeds the UI (`web/dist`) and the lesson content
+(`content/lessons.json`). On first run it creates `workspace/`, `.nivix/` and `.zt/`
+next to the exe, then serves the app at http://127.0.0.1:7788. The embedded ZeroTier
+(`libzt`) transport is excluded from the exe, so it falls back to LAN; pass
+`--ui <dir>` / `--port <n>` to override defaults.

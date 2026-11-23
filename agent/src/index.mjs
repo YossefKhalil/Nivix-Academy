@@ -12,7 +12,7 @@
  */
 import http from 'node:http'
 import { createReadStream, existsSync, readFileSync, statSync, mkdirSync, writeFileSync } from 'node:fs'
-import { extname, join, resolve as resolvePath } from 'node:path'
+import { dirname, extname, join, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { WebSocketServer, WebSocket } from 'ws'
@@ -28,8 +28,10 @@ import { createConfig } from './config.mjs'
 import { startAnnouncer, discover } from './discovery.mjs'
 import { RelayClient } from './relay-client.mjs'
 
-const here = fileURLToPath(new URL('.', import.meta.url))
-const AGENT_ROOT = resolvePath(here, '..')
+const PACKAGED = !!process.pkg
+let here = ''
+try { here = fileURLToPath(new URL('.', import.meta.url)) } catch { here = process.cwd() + (process.platform === 'win32' ? '\\' : '/') }
+const AGENT_ROOT = PACKAGED ? resolvePath(dirname(process.execPath)) : resolvePath(here, '..')
 
 // Load agent/.env (and a repo-level .env) if present.
 try { process.loadEnvFile(join(AGENT_ROOT, '.env')) } catch { /* no agent .env */ }
@@ -44,7 +46,7 @@ const opt = (name, def) => {
 
 const PORT = Number(opt('port', 7788))
 const BIND = opt('host', '0.0.0.0')
-const UI_DIR = resolvePath(opt('ui', join(AGENT_ROOT, '..', 'web', 'dist')))
+const UI_DIR = resolvePath(opt('ui', PACKAGED ? join(__dirname, '..', '..', 'web', 'dist') : join(AGENT_ROOT, '..', 'web', 'dist')))
 const WORKSPACE = resolvePath(opt('workspace', join(AGENT_ROOT, 'workspace')))
 
 /* ── workspace starters ─────────────────────────────── */

@@ -1,0 +1,6 @@
+{
+  "assets": [
+    "content/lessons.json",
+    "web/dist/**/*"
+  ]
+}

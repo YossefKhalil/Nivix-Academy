@@ -14,5 +14,9 @@
   "dependencies": {
     "libzt": "^0.2.0",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.26.0",
+    "esbuild": "^0.28.2"
   }
 }

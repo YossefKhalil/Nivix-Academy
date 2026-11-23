@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url'
 
 /* Course content is the single source of truth for lesson order, ports and
    test names. The probes below implement those named tests. */
-const here = fileURLToPath(new URL('.', import.meta.url))
-const CONTENT = join(here, '..', '..', 'content', 'lessons.json')
+const CONTENT = process.pkg
+  ? join(__dirname, '..', '..', 'content', 'lessons.json')
+  : join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', 'content', 'lessons.json')
 let lessons = []
 try { lessons = JSON.parse(readFileSync(CONTENT, 'utf8')).lessons || [] } catch { lessons = [] }
 const coding = lessons.filter(l => l.kind === 'code')
