@@ -6,7 +6,7 @@
  *   • supervise the player's own HTTP server (python / csharp)
  *   • run the judge against it
  *   • open VS Code / Cursor / VSCodium
- *   • relay two peers over LAN or a ZeroTier network (host-authoritative)
+ *   • relay two peers over the LAN (host-authoritative)
  *
  * Usage: node src/index.mjs [--port 7788] [--workspace DIR] [--ui DIR] [--open]
  */
@@ -17,13 +17,11 @@ import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { WebSocketServer, WebSocket } from 'ws'
 
-import { networkSummary } from './zerotier.mjs'
+import { networkSummary } from './net.mjs'
 import { detectEditor, openEditor } from './editor.mjs'
 import { ServerRunner } from './runner.mjs'
 import { runRound } from './judge.mjs'
 import { Room } from './room.mjs'
-import { libztAvailable } from './transport.mjs'
-import { ztApi } from './zerotier-api.mjs'
 import { createConfig } from './config.mjs'
 import { startAnnouncer, discover } from './discovery.mjs'
 import { RelayClient } from './relay-client.mjs'
@@ -111,10 +109,9 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const makeCode = () => Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('')
 
 const state = { startedAt: Date.now(), logs: [] }
+let announcer = null
 
 const PEER_PORT = Number(opt('peer-port', 7789))
-let libztReady = false
-libztAvailable().then(v => { libztReady = v })
 
 const config = createConfig(AGENT_ROOT)
 
@@ -124,7 +121,6 @@ const relay = new RelayClient({
 })
 
 const room = new Room({
-  stateDir: join(AGENT_ROOT, '.zt'),
   onLog: line => {
     state.logs.push(line)
     if (state.logs.length > 500) state.logs.shift()
@@ -171,13 +167,11 @@ function status() {
     bind: BIND,
     workspace: WORKSPACE,
     uiBuilt: existsSync(join(UI_DIR, 'index.html')),
-    zerotier: net.zerotier,
     lan: net.lan,
     preferred: net.preferred,
     interfaces: net.interfaces,
     editor: detectEditor(),
     server: runner.status,
-    libzt: libztReady,
     relay: relay.status,
     room: room.snapshot(),
   }
@@ -269,18 +263,6 @@ function htmlToText(html) {
   return s.trim()
 }
 
-async function resolveNetwork(requested) {
-  const cfg = config.read()
-  if (requested && requested !== 'auto' && requested !== 'new') return requested
-  if (requested !== 'new' && cfg.ztNetwork) return cfg.ztNetwork
-  if (cfg.ztToken) {
-    const net = await ztApi.createNetwork(cfg.ztToken, { name: 'Nivix Academy', public: true })
-    config.write({ ztNetwork: net.id, ztNetworkName: net.config?.name || 'Nivix Academy' })
-    return net.id
-  }
-  return null
-}
-
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://local')
 
@@ -325,10 +307,11 @@ const server = http.createServer(async (req, res) => {
         try {
           const snap = await room.createHost({
             mode: body.mode,
-            network: body.mode === 'multi' ? await resolveNetwork(body.network) : undefined,
             maxPlayers: body.maxPlayers,
             peerPort: Number(body.peerPort) || PEER_PORT,
           })
+          try { announcer?.close() } catch { /* ignore */ }
+          announcer = snap.mode === 'multi' ? startAnnouncer({ code: snap.code, getInfo: () => ({ port: PEER_PORT }) }) : null
           return sendJson(res, 200, { ok: true, room: snap })
         } catch (e) {
           return sendJson(res, 500, { ok: false, error: String(e?.message || e) })
@@ -342,11 +325,9 @@ const server = http.createServer(async (req, res) => {
         if (!host || !code) return sendJson(res, 400, { ok: false, error: 'host and code required' })
         try {
           const r = await room.joinRemote({
-            network: body.network || config.read().ztNetwork || undefined,
             host,
             port: Number(body.port) || PEER_PORT,
             code,
-            member: { name: body.name, lang: body.lang },
           })
           return sendJson(res, 200, { ok: true, ...r })
         } catch (e) {
@@ -355,55 +336,17 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (url.pathname === '/api/leave' && req.method === 'POST') {
+        try { announcer?.close() } catch { /* ignore */ }
+        announcer = null
         await room.teardown()
         return sendJson(res, 200, { ok: true, room: room.snapshot() })
       }
 
-      if (url.pathname === '/api/zt' && req.method === 'GET') {
-        const cfg = config.read()
-        return sendJson(res, 200, {
-          ok: true,
-          tokenSet: !!cfg.ztToken,
-          network: cfg.ztNetwork || null,
-          networkName: cfg.ztNetworkName || null,
-        })
-      }
-
-      if (url.pathname === '/api/zt/token' && req.method === 'POST') {
-        const body = await readJson(req)
-        const token = String(body.token || '').trim()
-        if (!token) return sendJson(res, 400, { ok: false, error: 'token required' })
+      if (url.pathname === '/api/discover' && req.method === 'GET') {
+        const code = String(url.searchParams.get('code') || '').toUpperCase()
         try {
-          const networks = await ztApi.networks(token)
-          config.write({ ztToken: token })
-          return sendJson(res, 200, { ok: true, networks: Array.isArray(networks) ? networks.length : 0 })
-        } catch (e) {
-          return sendJson(res, 401, { ok: false, error: String(e?.message || e) })
-        }
-      }
-
-      if (url.pathname === '/api/zt/network' && req.method === 'POST') {
-        const cfg = config.read()
-        if (!cfg.ztToken) return sendJson(res, 400, { ok: false, error: 'save a ZeroTier token first' })
-        const body = await readJson(req)
-        try {
-          const net = await ztApi.createNetwork(cfg.ztToken, { name: body.name || 'Nivix Academy', public: body.public !== false })
-          config.write({ ztNetwork: net.id, ztNetworkName: net.config?.name || 'Nivix Academy' })
-          return sendJson(res, 200, { ok: true, network: { id: net.id, name: net.config?.name || 'Nivix Academy' } })
-        } catch (e) {
-          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
-        }
-      }
-
-      if (url.pathname === '/api/zt/authorize' && req.method === 'POST') {
-        const cfg = config.read()
-        const body = await readJson(req)
-        if (!cfg.ztToken || !cfg.ztNetwork || !body.memberId) {
-          return sendJson(res, 400, { ok: false, error: 'token, network and memberId required' })
-        }
-        try {
-          const member = await ztApi.authorize(cfg.ztToken, cfg.ztNetwork, String(body.memberId))
-          return sendJson(res, 200, { ok: true, member })
+          const found = await discover(code)
+          return sendJson(res, 200, { ok: !!found, host: found || null })
         } catch (e) {
           return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
         }
@@ -582,6 +525,36 @@ server.on('upgrade', (req, socket, head) => {
   })
 })
 
+/** Open the app in its own window: a browser in app mode (no tabs / URL bar). */
+function openAppWindow(url) {
+  try {
+    if (process.platform === 'win32') {
+      const pf = process.env['ProgramFiles'] || 'C:\\Program Files'
+      const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)'
+      const local = process.env['LOCALAPPDATA'] || ''
+      const exe = [
+        join(pf86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        join(pf, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        join(local, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        join(pf, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(pf86, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(local, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(pf, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
+        join(pf86, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
+        join(local, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
+        join(pf, 'Vivaldi', 'Application', 'vivaldi.exe'),
+        join(local, 'Programs', 'Opera', 'opera.exe'),
+      ].find(existsSync)
+      console.log(`  [open] ${exe || 'no chromium browser found - using default browser'}`)
+      if (exe) spawn(exe, [`--app=${url}`, '--new-window', '--window-size=1280,860'], { detached: true, stdio: 'ignore' }).unref()
+      else spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref()
+      return
+    }
+    const cmd = process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]]
+    spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref()
+  } catch { /* ignore */ }
+}
+
 server.listen(PORT, BIND, () => {
   const net = networkSummary()
   const editor = detectEditor()
@@ -589,25 +562,19 @@ server.listen(PORT, BIND, () => {
   console.log(`\n  ${line}`)
   console.log('  NIVIX ACADEMY · local agent')
   console.log(`  UI          http://127.0.0.1:${PORT}/`)
-  console.log(`  LAN / ZT    ${net.preferred ? `ws://${net.preferred}:${PORT}` : 'no external IPv4 found'}`)
-  console.log(`  ZeroTier    ${net.zerotier ? `${net.zerotier.name} · ${net.zerotier.address}` : 'not detected'}`)
-  console.log(`  libzt       ${libztReady ? 'available (embedded ZeroTier)' : 'not available — LAN sockets only'}`)
+  console.log(`  LAN         ${net.preferred ? `ws://${net.preferred}:${PORT}` : 'no external IPv4 found'}`)
   console.log(`  Peer port   ${PEER_PORT}`)
   console.log(`  Editor      ${editor ? `${editor.name} (${editor.command})` : 'none found'}`)
   console.log(`  Workspace   ${WORKSPACE}`)
   console.log(`  UI build    ${existsSync(join(UI_DIR, 'index.html')) ? UI_DIR : 'MISSING — run `npm run build` in web/'}`)
   console.log(`  ${line}\n`)
 
-  if (flag('open')) {
-    const url = `http://127.0.0.1:${PORT}/`
-    const cmd = process.platform === 'win32'
-      ? ['cmd', ['/c', 'start', '', url]]
-      : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]]
-    try { spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref() } catch { /* ignore */ }
-  }
+  const shouldOpen = PACKAGED ? !flag('no-open') : flag('open')
+  if (shouldOpen) openAppWindow(`http://127.0.0.1:${PORT}/`)
 })
 
 const shutdown = async () => {
+  try { announcer?.close() } catch { /* ignore */ }
   try { relay.leave() } catch { /* ignore */ }
   try { await room.teardown() } catch { /* ignore */ }
   try { await runner.stop() } catch { /* ignore */ }

@@ -12,7 +12,7 @@ import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
 import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, docsSearch, getKeys, saveKeys, discoverRoom, type AgentStatus, type DocResult } from './agent'
-import { useLiveRoom, createRoom, joinRoom, leaveRoom, getZt, setZtToken, createZtNetwork, relayCreate, relayJoin, relayLeave, type RoomMember } from './room'
+import { useLiveRoom, createRoom, joinRoom, leaveRoom, relayCreate, relayJoin, relayLeave, type RoomMember } from './room'
 
 type Send = (a: Action) => void
 const borderA = (c: string) => `color-mix(in oklab, ${c} 50%, transparent)`
@@ -646,7 +646,7 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
   const isHost = room ? room.role === 'host' : s.role === 'host'
   const canStart = members.length >= 1
   const isRelay = room?.transport === 'relay'
-  const peerAddr = agent?.zerotier?.address || agent?.lan?.address || agent?.preferred || null
+  const peerAddr = agent?.lan?.address || agent?.preferred || null
   const PEER_PORT = 7789
 
   const doSolo = async () => {

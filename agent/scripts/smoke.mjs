@@ -10,7 +10,7 @@ const get = path => fetch(base + path).then(r => r.json())
 const wait = ms => new Promise(r => setTimeout(r, ms))
 
 const status = await get('/api/status')
-console.log('status:', { ok: status.ok, libzt: status.libzt, zt: status.zerotier?.address, editor: status.editor?.name })
+console.log('status:', { ok: status.ok, lan: status.lan?.address, editor: status.editor?.name })
 
 const created = await post('/api/room', { mode: 'single' })
 console.log('room:', { ok: created.ok, code: created.room?.code, mode: created.room?.mode, count: created.room?.memberCount })

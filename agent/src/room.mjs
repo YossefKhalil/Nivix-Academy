@@ -1,4 +1,4 @@
-/* Room manager — host-authoritative, supports single-player and N-player rooms.
+/* Room manager - host-authoritative, supports single-player and N-player rooms.
  *
  * Host agent owns the member list and relays game actions to every browser and
  * peer agent. Guest agents forward their local member's intents to the host and
@@ -11,12 +11,10 @@ const makeCode = () => Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.
 const makeId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
 
 export class Room {
-  constructor({ stateDir, onLog = () => {} }) {
-    this.stateDir = stateDir
+  constructor({ onLog = () => {} }) {
     this.onLog = onLog
     this.code = null
     this.mode = 'single'
-    this.network = null
     this.maxPlayers = 8
     this.role = null
     this.hostId = null
@@ -33,7 +31,6 @@ export class Room {
     return {
       code: this.code,
       mode: this.mode,
-      network: this.network,
       maxPlayers: this.maxPlayers,
       role: this.role,
       hostId: this.hostId,
@@ -74,11 +71,10 @@ export class Room {
     return member
   }
 
-  async createHost({ mode, network, maxPlayers, peerPort }) {
+  async createHost({ mode, maxPlayers, peerPort }) {
     await this.teardown()
     this.role = 'host'
     this.mode = mode === 'multi' ? 'multi' : 'single'
-    this.network = network || null
     this.maxPlayers = Math.max(1, Math.min(32, Number(maxPlayers) || 8))
     this.code = makeCode()
     this.members.clear()
@@ -87,25 +83,22 @@ export class Room {
     if (this.mode === 'multi') {
       this.listener = await createPeerListener({
         port: peerPort,
-        network: this.network,
-        stateDir: `${this.stateDir}/host`,
         onConnection: (sock, kind) => this.attachPeerSocket(sock, kind),
       })
-      this.onLog(`[room] hosted on ${this.listener.kind}${this.listener.address ? ` ${this.listener.address}` : ''}:${peerPort}`)
+      this.onLog(`[room] hosted on ${this.listener.kind}:${peerPort}`)
     }
     this.broadcastRoom()
     return this.snapshot()
   }
 
-  async joinRemote({ network, host, port, code, member }) {
+  async joinRemote({ host, port, code }) {
     await this.teardown()
     this.role = 'guest'
     this.mode = 'multi'
-    this.network = network || null
     this.code = String(code || '').toUpperCase()
     this.members.clear()
 
-    const conn = await connectPeer({ host, port, network: this.network, stateDir: `${this.stateDir}/guest` })
+    const conn = await connectPeer({ host, port })
     this.outgoing = conn
     const pipe = jsonLineSocket(conn.socket, msg => this.onPeerMessage('out', msg))
     this.peers.set('out', { pipe, memberId: null, via: conn.kind })

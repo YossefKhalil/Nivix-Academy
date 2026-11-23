@@ -10,7 +10,6 @@ export interface AgentStatus {
   version: string
   port: number
   preferred: string | null
-  zerotier: { name: string; address: string } | null
   lan: { name: string; address: string } | null
   editor: { name: string; command: string } | null
   server: { running: boolean; lang: string | null; port: number | null }
@@ -134,6 +133,6 @@ export async function saveKeys(keys: { openaiKey?: string; openaiBase?: string; 
   } catch { return null }
 }
 
-export async function discoverRoom(code: string): Promise<{ ok: boolean; host?: { host: string; port: number; network: string | null; code: string } | null } | null> {
+export async function discoverRoom(code: string): Promise<{ ok: boolean; host?: { host: string; port: number; code: string } | null } | null> {
   try { return await (await fetch(url(`/api/discover?code=${encodeURIComponent(code)}`))).json() } catch { return null }
 }

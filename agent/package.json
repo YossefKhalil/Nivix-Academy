@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Nivix Academy local agent: serves the UI, supervises the player's server, judges rounds, relays rooms over LAN/ZeroTier.",
+  "description": "Nivix Academy local agent: serves the UI, supervises the player's server, judges rounds, relays rooms over the LAN or a relay.",
   "bin": {
     "http-duel": "src/index.mjs"
   },
@@ -12,7 +12,6 @@
     "dev": "node --watch src/index.mjs"
   },
   "dependencies": {
-    "libzt": "^0.2.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

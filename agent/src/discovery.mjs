@@ -1,8 +1,7 @@
-/* LAN / ZeroTier room discovery.
+/* LAN room discovery.
  *
  * The host announces its room on the local subnet(s) over UDP; a guest only
- * needs the room code and the app finds the host automatically. Works on a
- * plain LAN and on a ZeroTier network (both are broadcast domains).
+ * needs the room code and the app finds the host automatically.
  */
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -48,7 +47,7 @@ export function discover(code, timeoutMs = 1600) {
       try {
         const j = JSON.parse(msg.toString())
         if (j.magic === MAGIC && (!want || j.code === want)) {
-          found.push({ host: rinfo.address, port: j.port, network: j.network || null, code: j.code })
+          found.push({ host: rinfo.address, port: j.port, code: j.code })
         }
       } catch { /* ignore */ }
     })

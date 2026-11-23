@@ -41,17 +41,9 @@ async function post(path: string, body?: unknown) {
     return await r.json()
   } catch { return null }
 }
-async function get(path: string) {
-  try { return await (await fetch(api(path))).json() } catch { return null }
-}
-
-export const createRoom = (opts: { mode: string; maxPlayers?: number; network?: string }) => post('/api/room', opts)
-export const joinRoom = (opts: { network?: string; host: string; port?: number; code: string; name?: string; lang?: string }) => post('/api/join', opts)
+export const createRoom = (opts: { mode: string; maxPlayers?: number }) => post('/api/room', opts)
+export const joinRoom = (opts: { host: string; port?: number; code: string; name?: string; lang?: string }) => post('/api/join', opts)
 export const leaveRoom = () => post('/api/leave')
-
-export const getZt = () => get('/api/zt')
-export const setZtToken = (token: string) => post('/api/zt/token', { token })
-export const createZtNetwork = (opts?: { name?: string; public?: boolean }) => post('/api/zt/network', opts)
 
 export const relayCreate = (opts: { relayUrl?: string; maxPlayers?: number; name?: string; lang?: string }) => post('/api/relay/room', opts)
 export const relayJoin = (opts: { relayUrl?: string; code: string; name?: string; lang?: string }) => post('/api/relay/join', opts)
