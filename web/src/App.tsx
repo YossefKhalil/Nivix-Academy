@@ -965,7 +965,14 @@ function Brief({ s, send }: { s: State; send: Send }) {
 function LeftTabs({ s, send }: { s: State; send: Send }) {
   const [chat, setChat] = useState('')
   const [ask, setAsk] = useState('')
-  const docs: [string, string][] = []
+  const docs: { title: string; url: string; source: string }[] = [
+    { title: 'MDN - HTTP overview', url: 'https://developer.mozilla.org/en-US/docs/Web/HTTP', source: 'MDN' },
+    { title: 'RFC 9110 - HTTP Semantics', url: 'https://www.rfc-editor.org/rfc/rfc9110', source: 'RFC' },
+    { title: 'MDN - Authorization header', url: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Authorization', source: 'MDN' },
+    { title: 'MDN - POST method', url: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/POST', source: 'MDN' },
+    { title: 'Python - http.server', url: 'https://docs.python.org/3/library/http.server.html', source: 'Python' },
+    { title: 'C# - HttpListener', url: 'https://learn.microsoft.com/dotnet/api/system.net.httplistener', source: 'MS Learn' },
+  ]
   const canAsk = s.energy >= COST_AI
   const [wikiQ, setWikiQ] = useState('')
   const [wikiResults, setWikiResults] = useState<{ title: string; url: string; source: string }[] | null>(null)
@@ -1046,39 +1053,18 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
       {s.leftTab === 'wiki' && (
         <>
           <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 shrink-0">
-            <span className="w-1 h-3 shrink-0" style={{ background: 'var(--accent-secondary)', boxShadow: '0 0 8px color-mix(in oklab, var(--accent-secondary) 60%, transparent)' }} />
-            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>CURATED DOCS · context7</span>
+            <span className="w-1 h-3 shrink-0" style={{ background: 'var(--accent-secondary)' }} />
+            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>REFERENCE</span>
             <span className="flex-1" />
             <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{docs.length}</span>
           </div>
-          <form onSubmit={submitWiki} className="px-3 pt-1 pb-2 shrink-0">
-            <div className="inputgroup">
-              <span className="font-mono text-[11px]" style={{ color: 'var(--color-primary)' }}>⌕</span>
-              <input value={wikiQ} onChange={e => setWikiQ(e.target.value)} placeholder="search docs..." className="flex-1 bg-transparent outline-none font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }} />
-              <button type="submit" className="micro">SEARCH</button>
-            </div>
-            {note && <div className="font-mono text-[8px] mt-1.5" style={{ color: 'var(--color-amber)' }}>{note}</div>}
-          </form>
           <div className="flex-1 overflow-auto px-3 py-2 flex flex-col gap-1.5">
-            {wikiResults && wikiResults.map((d, i) => (
-              <a key={i} href={d.url || '#'} target="_blank" rel="noreferrer" className="group text-left flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}>
-                <span className="font-orbitron text-[13px] shrink-0" style={{ color: 'color-mix(in oklab, var(--accent-secondary) 80%, transparent)' }}>{String(i + 1).padStart(2, '0')}</span>
-                <span className="flex-1 flex flex-col gap-1 min-w-0">
-                  <span className="font-roboto text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{d.title}</span>
-                  <span className="font-mono text-[9px] px-1.5 py-0.5 self-start" style={{ color: 'var(--text-muted)', background: 'color-mix(in oklab, var(--accent-secondary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--accent-secondary) 28%, transparent)' }}>{d.source}</span>
-                </span>
+            {docs.map((d, i) => (
+              <a key={i} href={d.url} target="_blank" rel="noreferrer" className="group text-left flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)' }}>
+                <span className="font-roboto text-[12px] flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>{d.title}</span>
+                <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{d.source}</span>
                 <span className="font-mono text-[12px] transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--accent-secondary)' }}>↗</span>
               </a>
-            ))}
-            {!wikiResults && docs.map((d, i) => (
-              <button key={d[0]} className="group text-left flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}>
-                <span className="font-orbitron text-[13px] shrink-0" style={{ color: 'color-mix(in oklab, var(--accent-secondary) 80%, transparent)' }}>{String(i + 1).padStart(2, '0')}</span>
-                <span className="flex-1 flex flex-col gap-1 min-w-0">
-                  <span className="font-roboto text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{d[0]}</span>
-                  <span className="font-mono text-[9px] px-1.5 py-0.5 self-start" style={{ color: 'var(--text-muted)', background: 'color-mix(in oklab, var(--accent-secondary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--accent-secondary) 28%, transparent)' }}>{d[1]}</span>
-                </span>
-                <span className="font-mono text-[12px] transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--accent-secondary)' }}>↗</span>
-              </button>
             ))}
           </div>
         </>
@@ -1093,16 +1079,6 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
             <EnergyGauge value={s.energy} />
           </div>
           <div className="flex-1 overflow-auto px-3 py-2 flex flex-col gap-2">
-            {s.wiki.length === 0 && (
-              <>
-                <p className="font-roboto text-[12px] leading-5" style={{ color: 'var(--text-muted)' }}>Ask about headers, status codes, base64, JSON. Each answer costs {COST_AI} charges · +1 every {RECHARGE_SEC}s.</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {['401 + WWW-Authenticate', 'base64 decode', 'JSON body', '404 routing'].map(q => (
-                    <button key={q} onClick={() => setAsk(q)} className="font-mono text-[9px] px-2.5 py-1 cursor-pointer transition-colors" style={{ border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)', background: 'color-mix(in oklab, var(--color-primary) 6%, transparent)', color: 'var(--color-primary)', clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)' }}>{q}</button>
-                  ))}
-                </div>
-              </>
-            )}
 
             {s.wiki.map((w, i) => (
               <div key={i} className="flex flex-col gap-1.5">
