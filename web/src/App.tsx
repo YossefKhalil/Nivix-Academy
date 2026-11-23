@@ -11,7 +11,7 @@ import { Animator, Dots, Text, useBleeps } from '@arwes/react'
 import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
-import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, docsSearch, docsRead, getKeys, saveKeys, discoverRoom, type AgentStatus, type DocResult } from './agent'
+import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, docsSearch, getKeys, saveKeys, discoverRoom, type AgentStatus, type DocResult } from './agent'
 import { useLiveRoom, createRoom, joinRoom, leaveRoom, getZt, setZtToken, createZtNetwork, relayCreate, relayJoin, relayLeave, type RoomMember } from './room'
 
 type Send = (a: Action) => void
@@ -338,12 +338,11 @@ function MuteButton() {
 type ScoreRow = { id: string; name: string; lang: 'python' | 'csharp'; score?: number | null; stage?: number; host?: boolean; connected?: boolean; me?: boolean }
 
 function ScoreCard({ row, you, total }: { row: ScoreRow; you?: boolean; total: number }) {
-  const derived = row.score == null ? 0 : Math.max(0, Math.min(4, Math.ceil((row.score / Math.max(1, total)) * 4)))
-  const stage = row.stage != null ? Math.max(0, Math.min(4, row.stage)) : derived
+  const passed = row.score == null ? 0 : Math.max(0, Math.min(total, row.score))
   const tone = 'var(--color-primary)'
   return (
     <span
-      className="relative flex items-center gap-2.5 px-3 h-[34px] min-w-[160px] max-w-[230px]"
+      className="relative flex items-center gap-2.5 px-3 h-[34px] min-w-[160px] max-w-[260px]"
       style={{
         background: 'linear-gradient(180deg, color-mix(in oklab, var(--surface-raised) 92%, black), var(--surface))',
         boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 32%, transparent), 0 0 12px color-mix(in oklab, var(--color-primary) 10%, transparent)',
@@ -352,19 +351,22 @@ function ScoreCard({ row, you, total }: { row: ScoreRow; you?: boolean; total: n
     >
       <span className="font-orbitron text-[12px] tracking-[0.08em] truncate" style={{ color: 'var(--color-primary)' }}>{row.name}</span>
       <LangIcon lang={row.lang} size={12} />
-      <span className="flex items-center gap-[3px] ml-auto" title={`stage ${stage}/4`}>
-        {[1, 2, 3, 4].map(i => (
-          <i
-            key={i}
-            style={{
-              display: 'block', width: 7, height: 13,
-              background: i <= stage ? tone : 'color-mix(in oklab, var(--border) 85%, transparent)',
-              clipPath: 'polygon(36% 0, 100% 0, 64% 100%, 0 100%)',
-              boxShadow: i <= stage ? `0 0 9px ${tone}` : undefined,
-              transition: 'background 0.3s ease, box-shadow 0.3s ease',
-            }}
-          />
-        ))}
+      <span className="flex items-center gap-[3px] ml-auto" title={`${passed}/${total} tests`}>
+        {Array.from({ length: total }).map((_, i) => {
+          const on = i < passed
+          return (
+            <i
+              key={i}
+              style={{
+                display: 'block', width: 7, height: 13,
+                background: on ? tone : 'color-mix(in oklab, var(--border) 85%, transparent)',
+                clipPath: 'polygon(36% 0, 100% 0, 64% 100%, 0 100%)',
+                boxShadow: on ? `0 0 9px ${tone}` : undefined,
+                transition: 'background 0.3s ease, box-shadow 0.3s ease',
+              }}
+            />
+          )
+        })}
       </span>
       <span className="font-mono text-[12px]" style={{ color: tone, fontVariantNumeric: 'tabular-nums' }}>{row.score ?? '-'}<span style={{ color: 'var(--text-muted)' }}>/{total}</span></span>
     </span>
@@ -425,10 +427,10 @@ function Hud({ s, onSettings, roster, multiplayer }: { s: State; onSettings: () 
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
           <span className="font-orbitron text-[11px] tracking-[0.18em]" style={{ color: 'var(--text-secondary)' }}>ROUND {s.round}<span style={{ color: 'var(--text-muted)' }}>/{s.totalRounds}</span></span>
         </div>
-        <ScoreCard row={meRow} you total={total} />
+        {multiplayer && <ScoreCard row={meRow} you total={total} />}
       </div>
 
-      {/* centre - VS (fixed slot keeps the grid balanced) */}
+      {/* centre - VS in multiplayer, your card in solo */}
       {multiplayer ? (
         <span
           className="grid place-items-center w-[40px] h-[28px] font-orbitron font-bold text-[11px] tracking-[0.16em]"
@@ -442,7 +444,7 @@ function Hud({ s, onSettings, roster, multiplayer }: { s: State; onSettings: () 
           VS
         </span>
       ) : (
-        <span aria-hidden className="w-[40px] h-[28px]" />
+        <ScoreCard row={meRow} you total={total} />
       )}
 
       {/* right - opponent + vitals */}
@@ -993,7 +995,6 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
   const [note, setNote] = useState<string | null>(null)
   const [docQ, setDocQ] = useState('')
   const [docResults, setDocResults] = useState<DocResult[] | null>(null)
-  const [docOpen, setDocOpen] = useState<{ title: string; url: string; text: string } | null>(null)
   const [docBusy, setDocBusy] = useState(false)
   const [docError, setDocError] = useState<string | null>(null)
 
@@ -1001,18 +1002,11 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
     e.preventDefault()
     const q = docQ.trim()
     if (!q) return
-    setDocError(null); setDocBusy(true); setDocOpen(null)
+    setDocError(null); setDocBusy(true)
     const r = await docsSearch(q)
     setDocBusy(false)
     if (r?.ok) setDocResults(r.results || [])
     else setDocError(r?.error || 'docs backend offline')
-  }
-
-  const readDoc = async (d: DocResult) => {
-    setDocError(null); setDocOpen({ title: d.title, url: d.url, text: 'loading...' })
-    const r = await docsRead(d.url)
-    if (r?.ok && r.text) setDocOpen({ title: r.title || d.title, url: d.url, text: r.text })
-    else { setDocOpen(null); setDocError(r?.error || 'could not load page') }
   }
 
   const submitAsk = async (e: React.FormEvent) => {
@@ -1081,49 +1075,33 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
         <>
           <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 shrink-0">
             <span className="w-1 h-3 shrink-0" style={{ background: 'var(--accent-secondary)' }} />
-            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>{docOpen ? 'DOC READER' : 'DOCS SEARCH'}</span>
+            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>DOCS SEARCH</span>
             <span className="flex-1" />
-            {docOpen
-              ? <button onClick={() => setDocOpen(null)} className="micro">BACK</button>
-              : <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{docResults ? docResults.length : docs.length}</span>}
+            <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{docResults ? docResults.length : docs.length}</span>
           </div>
-
-          {docOpen ? (
-            <>
-              <div className="px-3 pb-2 shrink-0 flex flex-col gap-0.5">
-                <span className="font-roboto text-[12px] leading-5" style={{ color: 'var(--text-secondary)' }}>{docOpen.title}</span>
-                <a href={docOpen.url} target="_blank" rel="noreferrer" className="font-mono text-[8px] break-all" style={{ color: 'var(--accent-secondary)' }}>{docOpen.url}</a>
-              </div>
-              <div className="flex-1 overflow-auto px-3 pb-3">
-                <pre className="font-roboto text-[11px] leading-6 whitespace-pre-wrap m-0" style={{ color: 'var(--text-muted)' }}>{docOpen.text}</pre>
-              </div>
-            </>
-          ) : (
-            <>
-              <form onSubmit={runDocs} className="px-3 pb-2 shrink-0">
-                <div className="inputgroup">
-                  <span className="font-mono text-[12px]" style={{ color: 'var(--accent-secondary)' }}>?</span>
-                  <input value={docQ} onChange={e => setDocQ(e.target.value)} placeholder="search docs - MDN, RFC, Python, C#" className="flex-1 bg-transparent outline-none font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }} />
-                  <button type="submit" className="micro" disabled={docBusy}>{docBusy ? '...' : 'GO'}</button>
-                </div>
-              </form>
-              <div className="flex-1 overflow-auto px-3 pb-3 flex flex-col gap-1.5">
-                {docError && <div className="font-mono text-[9px] px-1" style={{ color: 'var(--color-amber)' }}>{docError}</div>}
-                {(docResults && docResults.length ? docResults : docs).map((d, i) => {
-                  const summary = (d as DocResult).summary
-                  return (
-                    <button key={i} onClick={() => readDoc(d)} className="group text-left flex flex-col gap-1 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)' }}>
-                      <span className="flex items-center gap-2 w-full">
-                        <span className="font-roboto text-[12px] flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>{d.title}</span>
-                        <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{d.source}</span>
-                      </span>
-                      {summary && <span className="font-roboto text-[10px] leading-4" style={{ color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{summary}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
+          <form onSubmit={runDocs} className="px-3 pb-2 shrink-0">
+            <div className="inputgroup">
+              <span className="font-mono text-[12px]" style={{ color: 'var(--accent-secondary)' }}>?</span>
+              <input value={docQ} onChange={e => setDocQ(e.target.value)} placeholder="search docs - MDN, RFC, Python, C#" className="flex-1 bg-transparent outline-none font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }} />
+              <button type="submit" className="micro" disabled={docBusy}>{docBusy ? '...' : 'GO'}</button>
+            </div>
+          </form>
+          <div className="flex-1 overflow-auto px-3 pb-3 flex flex-col gap-1.5">
+            {docError && <div className="font-mono text-[9px] px-1" style={{ color: 'var(--color-amber)' }}>{docError}</div>}
+            {(docResults && docResults.length ? docResults : docs).map((d, i) => {
+              const summary = (d as DocResult).summary
+              return (
+                <a key={i} href={d.url} target="_blank" rel="noreferrer" className="group text-left flex flex-col gap-1 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)' }}>
+                  <span className="flex items-center gap-2 w-full">
+                    <span className="font-roboto text-[12px] flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>{d.title}</span>
+                    <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{d.source}</span>
+                    <span className="font-mono text-[11px] shrink-0 transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--accent-secondary)' }}>↗</span>
+                  </span>
+                  {summary && <span className="font-roboto text-[10px] leading-4" style={{ color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{summary}</span>}
+                </a>
+              )
+            })}
+          </div>
         </>
       )}
 
