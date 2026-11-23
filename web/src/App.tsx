@@ -29,26 +29,31 @@ function Chip({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted
 }
 
 /** Window tabs - bleed into the panel header so they read as part of the frame. */
-function SegTabs({ value, onChange, items }: { value: string; onChange: (v: string) => void; items: { id: string; label: string }[] }) {
+function SegTabs({ value, onChange, items }: { value: string; onChange: (v: string) => void; items: { id: string; label: string; disabled?: boolean }[] }) {
   return (
     <div className="-mr-3 self-stretch flex items-stretch">
       {items.map((it, i) => {
         const active = value === it.id
+        const off = !!it.disabled
         return (
           <button
             key={it.id}
-            onClick={() => onChange(it.id)}
-            className="relative px-3 font-mono text-[10px] tracking-[0.16em] cursor-pointer transition-colors"
+            disabled={off}
+            title={off ? 'disabled' : undefined}
+            onClick={() => { if (!off) onChange(it.id) }}
+            className="relative px-3 font-mono text-[10px] tracking-[0.16em] transition-colors"
             style={{
-              color: active ? 'var(--color-primary)' : 'var(--text-muted)',
-              background: active ? 'color-mix(in oklab, var(--color-primary) 7%, transparent)' : 'transparent',
+              cursor: off ? 'not-allowed' : 'pointer',
+              color: off ? 'var(--text-muted)' : active ? 'var(--color-primary)' : 'var(--text-muted)',
+              opacity: off ? 0.4 : 1,
+              background: active && !off ? 'color-mix(in oklab, var(--color-primary) 7%, transparent)' : 'transparent',
               borderLeft: i ? '1px solid color-mix(in oklab, var(--border) 60%, transparent)' : undefined,
             }}
-            onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
+            onMouseEnter={e => { if (!active && !off) e.currentTarget.style.color = 'var(--text-secondary)' }}
+            onMouseLeave={e => { if (!active && !off) e.currentTarget.style.color = 'var(--text-muted)' }}
           >
             <span className="relative z-[1]">{it.label}</span>
-            <span aria-hidden className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: active ? 'var(--color-primary)' : 'transparent', boxShadow: active ? '0 0 10px color-mix(in oklab, var(--color-primary) 55%, transparent)' : undefined }} />
+            <span aria-hidden className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: active && !off ? 'var(--color-primary)' : 'transparent', boxShadow: active && !off ? '0 0 10px color-mix(in oklab, var(--color-primary) 55%, transparent)' : undefined }} />
           </button>
         )
       })}
@@ -1028,7 +1033,7 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
 
   return (
     <div className="cosmic-panel flex flex-col min-h-0 anim-in">
-      <PanelHead title="SUPPORT" right={<SegTabs value={s.leftTab} onChange={v => send({ type: 'LEFT_TAB', value: v })} items={[{ id: 'comms', label: 'CHAT' }, { id: 'wiki', label: 'WIKI' }, { id: 'ai', label: 'NIVIX AI' }]} />} />
+      <PanelHead title="SUPPORT" right={<SegTabs value={s.leftTab} onChange={v => send({ type: 'LEFT_TAB', value: v })} items={[{ id: 'comms', label: 'CHAT' }, { id: 'wiki', label: 'WIKI' }, { id: 'ai', label: 'NIVIX AI', disabled: true }]} />} />
 
       {s.leftTab === 'comms' && (
         <>
