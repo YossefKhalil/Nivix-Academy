@@ -11,7 +11,7 @@ import { Animator, Dots, Text, useBleeps } from '@arwes/react'
 import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
-import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, wikiSearch, getKeys, saveKeys, type AgentStatus } from './agent'
+import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, wikiSearch, getKeys, saveKeys, discoverRoom, type AgentStatus } from './agent'
 import { useLiveRoom, createRoom, joinRoom, leaveRoom, getZt, setZtToken, createZtNetwork, relayCreate, relayJoin, relayLeave, type RoomMember } from './room'
 
 type Send = (a: Action) => void
@@ -613,7 +613,7 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
   const [joinCode, setJoinCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
-  const RELAY_URL = 'http://127.0.0.1:8090'
+  const [netMode, setNetMode] = useState<'online' | 'lan'>('online')
 
   useEffect(() => {
     if (!live.connected) return
@@ -640,7 +640,9 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
     setNote(null); setBusy(true)
     try {
       if (agent && live.connected) {
-        const r = await relayCreate({ relayUrl: RELAY_URL, maxPlayers: 8, name: s.me.name || 'HOST', lang: s.me.lang })
+        const r = netMode === 'lan'
+          ? await createRoom({ mode: 'multi', maxPlayers: 8 })
+          : await relayCreate({ maxPlayers: 8, name: s.me.name || 'HOST', lang: s.me.lang })
         if (!r?.ok) { setNote(r?.error || 'could not create room'); return }
       }
       send({ type: 'CREATE_ROOM' })
@@ -652,7 +654,14 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
     setNote(null); setBusy(true)
     try {
       if (agent && live.connected) {
-        const r = await relayJoin({ relayUrl: RELAY_URL, code: joinCode, name: s.me.name || 'PLAYER', lang: s.me.lang })
+        let r
+        if (netMode === 'lan') {
+          const d = await discoverRoom(joinCode)
+          if (!d?.ok || !d.host) { setNote('LAN: room not found on this network'); return }
+          r = await joinRoom({ host: d.host.host, port: d.host.port, code: joinCode, name: s.me.name || 'PLAYER', lang: s.me.lang })
+        } else {
+          r = await relayJoin({ code: joinCode, name: s.me.name || 'PLAYER', lang: s.me.lang })
+        }
         if (!r?.ok) { setNote(r?.error || 'could not join'); return }
       }
       send({ type: 'JOIN_ROOM' })
@@ -730,6 +739,13 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
 
           {!inRoom ? (
             <>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>MULTIPLAYER</span>
+                {(['online', 'lan'] as const).map(m => (
+                  <button key={m} onClick={() => setNetMode(m)} className="micro" style={{ color: netMode === m ? 'var(--color-primary)' : undefined, boxShadow: netMode === m ? 'inset 0 0 0 1px var(--color-primary)' : undefined }}>{m === 'online' ? 'ONLINE' : 'LAN'}</button>
+                ))}
+                <span className="font-mono text-[8px]" style={{ color: 'var(--text-muted)' }}>{netMode === 'online' ? 'via relay - any network' : 'same network only'}</span>
+              </div>
               <div className="grid grid-cols-3 gap-4">
                 <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
                   <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>PLAY SOLO</span>
@@ -1501,15 +1517,16 @@ function Settings({ onClose }: { onClose: () => void }) {
     try { localStorage.setItem('duel.editor', v) } catch { /* ignore */ }
   }
 
-  const [keys, setKeys] = useState<{ openaiSet: boolean; openaiBase: string; openaiModel: string; context7Set: boolean } | null>(null)
+  const [keys, setKeys] = useState<{ openaiSet: boolean; openaiBase: string; openaiModel: string; context7Set: boolean; relayUrl?: string } | null>(null)
   const [openaiKey, setOpenaiKey] = useState('')
   const [openaiBase, setOpenaiBase] = useState('')
   const [openaiModel, setOpenaiModel] = useState('')
   const [context7Key, setContext7Key] = useState('')
+  const [relayUrl, setRelayUrl] = useState('')
   const [keyNote, setKeyNote] = useState<string | null>(null)
-  useEffect(() => { getKeys().then(k => { if (k) { setKeys(k); setOpenaiBase(k.openaiBase || ''); setOpenaiModel(k.openaiModel || '') } }) }, [])
+  useEffect(() => { getKeys().then(k => { if (k) { setKeys(k); setOpenaiBase(k.openaiBase || ''); setOpenaiModel(k.openaiModel || ''); setRelayUrl(k.relayUrl || '') } }) }, [])
   const saveKeysNow = async () => {
-    const r = await saveKeys({ openaiKey, openaiBase, openaiModel, context7Key })
+    const r = await saveKeys({ openaiKey, openaiBase, openaiModel, context7Key, relayUrl })
     if (r?.ok) { setOpenaiKey(''); setContext7Key(''); setKeys(await getKeys()); setKeyNote('saved') }
     else setKeyNote(r?.error || 'could not save')
   }
@@ -1558,6 +1575,7 @@ function Settings({ onClose }: { onClose: () => void }) {
               <input value={openaiModel} onChange={e => setOpenaiModel(e.target.value)} placeholder="model" className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
             </div>
             <input value={context7Key} onChange={e => setContext7Key(e.target.value)} type="password" placeholder={keys?.context7Set ? 'Context7 key (saved)' : 'Context7 API key'} className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
+            <input value={relayUrl} onChange={e => setRelayUrl(e.target.value)} placeholder="relay URL (online mode)" className="font-mono text-[10px] px-2 py-1.5 border bg-transparent outline-none" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }} />
             <div className="flex items-center gap-2">
               <button onClick={saveKeysNow} className="micro">SAVE KEYS</button>
               {keyNote && <span className="font-mono text-[8px]" style={{ color: 'var(--color-amber)' }}>{keyNote}</span>}

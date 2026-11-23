@@ -53,8 +53,8 @@ export const getZt = () => get('/api/zt')
 export const setZtToken = (token: string) => post('/api/zt/token', { token })
 export const createZtNetwork = (opts?: { name?: string; public?: boolean }) => post('/api/zt/network', opts)
 
-export const relayCreate = (opts: { relayUrl: string; maxPlayers?: number; name?: string; lang?: string }) => post('/api/relay/room', opts)
-export const relayJoin = (opts: { relayUrl: string; code: string; name?: string; lang?: string }) => post('/api/relay/join', opts)
+export const relayCreate = (opts: { relayUrl?: string; maxPlayers?: number; name?: string; lang?: string }) => post('/api/relay/room', opts)
+export const relayJoin = (opts: { relayUrl?: string; code: string; name?: string; lang?: string }) => post('/api/relay/join', opts)
 export const relayLeave = () => post('/api/relay/leave')
 
 function normalizeRelay(r: any, you?: string): RoomState {

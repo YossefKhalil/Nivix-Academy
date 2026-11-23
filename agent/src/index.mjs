@@ -403,7 +403,7 @@ const server = http.createServer(async (req, res) => {
         const body = await readJson(req)
         try {
           const r = await relay.create({
-            relayUrl: body.relayUrl || 'http://127.0.0.1:8090',
+            relayUrl: body.relayUrl || config.read().relayUrl || 'http://127.0.0.1:8090',
             maxPlayers: body.maxPlayers,
             totalRounds: body.totalRounds,
             name: body.name,
@@ -420,7 +420,7 @@ const server = http.createServer(async (req, res) => {
         const code = String(body.code || '').toUpperCase()
         if (!code) return sendJson(res, 400, { ok: false, error: 'code required' })
         try {
-          await relay.join({ relayUrl: body.relayUrl || 'http://127.0.0.1:8090', code, name: body.name, lang: body.lang })
+          await relay.join({ relayUrl: body.relayUrl || config.read().relayUrl || 'http://127.0.0.1:8090', code, name: body.name, lang: body.lang })
           return sendJson(res, 200, { ok: true, code, room: relay.room, relay: relay.status })
         } catch (e) {
           return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
@@ -512,6 +512,7 @@ const server = http.createServer(async (req, res) => {
           ok: true,
           openaiSet: !!ai.key, openaiBase: ai.base, openaiModel: ai.model,
           context7Set: !!c7.key,
+          relayUrl: config.read().relayUrl || '',
         })
       }
 
@@ -522,6 +523,7 @@ const server = http.createServer(async (req, res) => {
         if (typeof body.openaiBase === 'string' && body.openaiBase.trim()) patch.openaiBase = body.openaiBase.trim()
         if (typeof body.openaiModel === 'string' && body.openaiModel.trim()) patch.openaiModel = body.openaiModel.trim()
         if (typeof body.context7Key === 'string' && body.context7Key.trim()) patch.context7Key = body.context7Key.trim()
+        if (typeof body.relayUrl === 'string') patch.relayUrl = body.relayUrl.trim()
         config.write(patch)
         return sendJson(res, 200, { ok: true })
       }

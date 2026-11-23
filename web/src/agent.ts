@@ -108,13 +108,14 @@ export interface KeyStatus {
   openaiBase: string
   openaiModel: string
   context7Set: boolean
+  relayUrl?: string
 }
 
 export async function getKeys(): Promise<KeyStatus | null> {
   try { return await (await fetch(url('/api/keys'))).json() } catch { return null }
 }
 
-export async function saveKeys(keys: { openaiKey?: string; openaiBase?: string; openaiModel?: string; context7Key?: string }) {
+export async function saveKeys(keys: { openaiKey?: string; openaiBase?: string; openaiModel?: string; context7Key?: string; relayUrl?: string }) {
   try {
     return await (await fetch(url('/api/keys'), {
       method: 'POST',
@@ -122,4 +123,8 @@ export async function saveKeys(keys: { openaiKey?: string; openaiBase?: string; 
       body: JSON.stringify(keys),
     })).json()
   } catch { return null }
+}
+
+export async function discoverRoom(code: string): Promise<{ ok: boolean; host?: { host: string; port: number; network: string | null; code: string } | null } | null> {
+  try { return await (await fetch(url(`/api/discover?code=${encodeURIComponent(code)}`))).json() } catch { return null }
 }
