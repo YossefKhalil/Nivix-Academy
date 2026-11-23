@@ -29,48 +29,35 @@ function Chip({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted
 }
 
 function SegTabs({ value, onChange, items }: { value: string; onChange: (v: string) => void; items: { id: string; label: string }[] }) {
-  const n = Math.max(1, items.length)
-  const idx = Math.max(0, items.findIndex(i => i.id === value))
+  const corner = (style: CSSProperties) => ({ position: 'absolute', width: 8, height: 8, ...style } as CSSProperties)
   return (
-    <div
-      className="relative inline-flex items-center overflow-hidden"
-      style={{
-        width: 236,
-        height: 28,
-        borderRadius: 6,
-        clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
-        background: 'linear-gradient(180deg, color-mix(in oklab, var(--surface-raised) 92%, black), color-mix(in oklab, var(--surface) 96%, black))',
-        boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 28%, transparent), inset 0 2px 12px rgba(0,0,0,0.55), 0 0 20px color-mix(in oklab, var(--color-primary) 10%, transparent)',
-      }}
-    >
-      <span
-        aria-hidden
-        className="absolute transition-all duration-300 ease-out"
-        style={{
-          top: 2,
-          bottom: 2,
-          left: `calc(${idx} * (100% / ${n}) + 2px)`,
-          width: `calc(100% / ${n} - 4px)`,
-          borderRadius: 4,
-          background: 'linear-gradient(180deg, #8fe0ff, var(--color-primary))',
-          boxShadow: '0 0 16px color-mix(in oklab, var(--color-primary) 55%, transparent), inset 0 1px 0 rgba(255,255,255,0.5)',
-        }}
-      />
-      {items.map(it => {
-        const active = value === it.id
-        return (
-          <button
-            key={it.id}
-            onClick={() => onChange(it.id)}
-            className="relative z-[1] flex-1 h-full font-mono text-[9px] tracking-[0.08em] cursor-pointer"
-            style={{ color: active ? '#04070c' : 'var(--text-muted)', fontWeight: active ? 600 : 400 }}
-            onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
-          >
-            {it.label}
-          </button>
-        )
-      })}
+    <div className="relative inline-flex items-stretch">
+      <span aria-hidden style={corner({ top: -1, left: -1, borderTop: '1px solid var(--color-primary)', borderLeft: '1px solid var(--color-primary)' })} />
+      <span aria-hidden style={corner({ top: -1, right: -1, borderTop: '1px solid var(--color-primary)', borderRight: '1px solid var(--color-primary)' })} />
+      <span aria-hidden style={corner({ bottom: -1, left: -1, borderBottom: '1px solid var(--color-primary)', borderLeft: '1px solid var(--color-primary)' })} />
+      <span aria-hidden style={corner({ bottom: -1, right: -1, borderBottom: '1px solid var(--color-primary)', borderRight: '1px solid var(--color-primary)' })} />
+      <div className="inline-flex items-stretch" style={{ border: '1px solid var(--border)', background: 'color-mix(in oklab, var(--surface) 92%, black)' }}>
+        {items.map((it, i) => {
+          const active = value === it.id
+          return (
+            <button
+              key={it.id}
+              onClick={() => onChange(it.id)}
+              className="relative font-mono text-[9px] tracking-[0.16em] px-3 py-[5px] cursor-pointer transition-colors"
+              style={{
+                color: active ? 'var(--color-primary)' : 'var(--text-muted)',
+                background: active ? 'color-mix(in oklab, var(--color-primary) 6%, transparent)' : 'transparent',
+                borderLeft: i ? '1px solid var(--border)' : undefined,
+                textShadow: active ? '0 0 8px color-mix(in oklab, var(--color-primary) 45%, transparent)' : undefined,
+              }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
+            >
+              {it.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -447,25 +434,25 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
         <ScoreCard row={meRow} you total={total} />
       </div>
 
-      {/* centre - VS (own column, so it stays centred) */}
-      <span
-        className="grid place-items-center w-[40px] h-[28px] font-orbitron font-bold text-[11px] tracking-[0.16em]"
-        style={{
-          color: 'var(--color-primary)',
-          background: 'linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 22%, transparent), color-mix(in oklab, var(--color-primary) 6%, transparent))',
-          boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 45%, transparent), 0 0 14px color-mix(in oklab, var(--color-primary) 18%, transparent)',
-          clipPath: 'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
-        }}
-      >
-        {others.length === 0 ? 'SOLO' : 'VS'}
-      </span>
+      {/* centre - VS (only when there is an opponent) */}
+      {others.length > 0 && (
+        <span
+          className="grid place-items-center w-[40px] h-[28px] font-orbitron font-bold text-[11px] tracking-[0.16em]"
+          style={{
+            color: 'var(--color-primary)',
+            background: 'linear-gradient(135deg, color-mix(in oklab, var(--color-primary) 22%, transparent), color-mix(in oklab, var(--color-primary) 6%, transparent))',
+            boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 45%, transparent), 0 0 14px color-mix(in oklab, var(--color-primary) 18%, transparent)',
+            clipPath: 'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
+          }}
+        >
+          VS
+        </span>
+      )}
 
       {/* right - opponent + vitals */}
       <div className="flex items-center justify-between gap-4 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          {opponent
-            ? <ScoreCard row={opponent} total={total} />
-            : <span className="font-orbitron text-[10px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{others.length === 0 ? 'SOLO RUN' : 'WAITING…'}</span>}
+          {others.length > 0 && opponent && <ScoreCard row={opponent} total={total} />}
           {extra > 0 && (
             <span className="grid place-items-center h-[24px] px-2 font-mono text-[9px]" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 12%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)' }}>+{extra}</span>
           )}
@@ -475,7 +462,7 @@ function Hud({ s, onSettings, roster }: { s: State; onSettings: () => void; rost
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
           <span className="font-mono text-[13px] tracking-[0.06em]" style={{ fontVariantNumeric: 'tabular-nums', minWidth: 52, textAlign: 'right' }}>{fmt(s.elapsed)}</span>
           <span className="h-3.5 w-px" style={{ background: 'var(--border)' }} />
-          <ScoreDropdown roster={roster} />
+          {others.length > 0 && <ScoreDropdown roster={roster} />}
           <button onClick={onSettings} title="settings" className="relative cursor-pointer bg-transparent border-0 text-[13px] leading-none" style={{ color: 'var(--text-secondary)' }}>⚙</button>
         </div>
       </div>
@@ -916,34 +903,34 @@ function VideoSlice({ video }: { video: { id: string; start: number; end: number
   }
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ border: '1px solid color-mix(in oklab, var(--color-primary) 32%, transparent)', boxShadow: '0 0 22px color-mix(in oklab, var(--color-primary) 8%, transparent)' }}>
-      <div className="flex items-center gap-2 px-2.5 py-1" style={{ background: 'color-mix(in oklab, var(--surface-raised) 92%, black)', borderBottom: '1px solid var(--border)' }}>
-        <span className="block w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-primary)', boxShadow: '0 0 8px var(--color-primary)' }} />
-        <span className="font-mono text-[8px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>ARCHIVE FEED</span>
-        <span className="flex-1" />
-        <span className="font-mono text-[8px]" style={{ color: 'var(--text-muted)' }}>{clock(video.start)} - {clock(video.end)}</span>
-      </div>
-      <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000' }}>
-        <div ref={hostRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
-      </div>
-      <div className="px-2.5 py-2 flex flex-col gap-1.5" style={{ background: 'var(--surface-raised)', borderTop: '1px solid var(--border)' }}>
-        <div
-          ref={seekRef}
-          className="relative h-[6px] cursor-pointer"
-          style={{ background: 'color-mix(in oklab, var(--border) 80%, transparent)' }}
-          onPointerDown={e => { e.stopPropagation(); seekTo(e.clientX) }}
-          onPointerMove={e => { if (e.buttons === 1) seekTo(e.clientX) }}
-          title="seek within the slice"
-        >
-          <span className="absolute inset-y-0 left-0" style={{ width: `${progress * 100}%`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 55%, transparent)' }} />
-          <span className="absolute top-1/2 -translate-y-1/2 w-[10px] h-[10px] rounded-full" style={{ left: `calc(${progress * 100}% - 5px)`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 60%, transparent)' }} />
+    <div className="relative">
+      <span aria-hidden style={{ position: 'absolute', top: -1, left: -1, width: 12, height: 12, borderTop: '1px solid var(--color-primary)', borderLeft: '1px solid var(--color-primary)', filter: 'drop-shadow(0 0 6px color-mix(in oklab, var(--color-primary) 45%, transparent))' }} />
+      <span aria-hidden style={{ position: 'absolute', top: -1, right: -1, width: 12, height: 12, borderTop: '1px solid var(--color-primary)', borderRight: '1px solid var(--color-primary)' }} />
+      <span aria-hidden style={{ position: 'absolute', bottom: -1, left: -1, width: 12, height: 12, borderBottom: '1px solid var(--color-primary)', borderLeft: '1px solid var(--color-primary)' }} />
+      <span aria-hidden style={{ position: 'absolute', bottom: -1, right: -1, width: 12, height: 12, borderBottom: '1px solid var(--color-primary)', borderRight: '1px solid var(--color-primary)' }} />
+      <div className="flex flex-col" style={{ border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)' }}>
+        <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000' }}>
+          <div ref={hostRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[9px] tracking-[0.12em] truncate" style={{ color: 'var(--text-muted)' }}>{(video.label || 'CLIP').toUpperCase()}</span>
-          <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--color-primary)', background: 'color-mix(in oklab, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in oklab, var(--color-primary) 30%, transparent)' }}>{clock(video.start)} - {clock(video.end)}</span>
-          <span className="flex-1" />
-          <span className="font-mono text-[9px] shrink-0" style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{clock(Math.max(video.start, Math.min(video.end, current)))} <span style={{ color: 'var(--text-muted)' }}>/ {clock(video.end)}</span></span>
-          <button onClick={restart} className="micro shrink-0">⟲ RESTART</button>
+        <div className="px-2.5 pt-2 pb-2 flex flex-col gap-2" style={{ background: 'color-mix(in oklab, var(--surface-raised) 92%, black)', borderTop: '1px solid var(--border)' }}>
+          <div
+            ref={seekRef}
+            className="relative h-[4px] cursor-pointer"
+            style={{ background: 'color-mix(in oklab, var(--border) 80%, transparent)' }}
+            onPointerDown={e => { e.stopPropagation(); seekTo(e.clientX) }}
+            onPointerMove={e => { if (e.buttons === 1) seekTo(e.clientX) }}
+            title="seek within the slice"
+          >
+            <span className="absolute inset-y-0 left-0" style={{ width: `${progress * 100}%`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 55%, transparent)' }} />
+            <span className="absolute top-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full" style={{ left: `calc(${progress * 100}% - 4px)`, background: 'var(--color-primary)', boxShadow: '0 0 8px color-mix(in oklab, var(--color-primary) 60%, transparent)' }} />
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="font-mono text-[9px] tracking-[0.14em] shrink-0" style={{ color: 'var(--color-primary)' }}>CH</span>
+            <span className="font-mono text-[10px] tracking-[0.04em] truncate min-w-0" style={{ color: 'var(--text-secondary)' }}>{video.label || 'LESSON CLIP'}</span>
+            <span className="flex-1" />
+            <span className="font-mono text-[10px] shrink-0" style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{clock(Math.max(video.start, Math.min(video.end, current)))} <span style={{ color: 'var(--text-muted)' }}>/ {clock(video.end)}</span></span>
+            <button onClick={restart} className="font-mono text-[9px] tracking-[0.12em] px-2 py-[3px] cursor-pointer shrink-0 transition-colors" style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)', background: 'transparent' }}>RESTART</button>
+          </div>
         </div>
       </div>
     </div>
