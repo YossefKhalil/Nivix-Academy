@@ -1,4 +1,4 @@
-# Nivix Academy — HTTP DUEL
+# Nivix Academy
 
 A local-first, two-player game for learning HTTP & networking. You write a real
 HTTP server in **Python**, your friend writes one in **C#**, and you duel through

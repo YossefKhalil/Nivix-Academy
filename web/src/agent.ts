@@ -1,4 +1,4 @@
-/* Client for the local HTTP DUEL agent.
+/* Client for the local Nivix Academy agent.
    When the UI is served by the agent it's same-origin; during `vite dev`
    set VITE_AGENT_URL=http://127.0.0.1:7788. */
 
@@ -96,9 +96,19 @@ export async function nivixAsk(question: string): Promise<{ ok: boolean; answer?
   } catch { return null }
 }
 
-export async function wikiSearch(q: string): Promise<{ ok: boolean; results?: { title: string; url: string; source: string }[]; error?: string } | null> {
+export interface DocResult { title: string; url: string; source: string; summary?: string }
+
+/** Online docs search (proxied by the agent; default backend is the MDN search API). */
+export async function docsSearch(q: string): Promise<{ ok: boolean; results?: DocResult[]; error?: string } | null> {
   try {
-    return await (await fetch(url(`/api/wiki?q=${encodeURIComponent(q)}`))).json()
+    return await (await fetch(url(`/api/docs?q=${encodeURIComponent(q)}`))).json()
+  } catch { return null }
+}
+
+/** Fetch a doc page and return it as readable text for the in-app reader. */
+export async function docsRead(page: string): Promise<{ ok: boolean; title?: string; text?: string; error?: string } | null> {
+  try {
+    return await (await fetch(url(`/api/docs/read?url=${encodeURIComponent(page)}`))).json()
   } catch { return null }
 }
 
@@ -107,7 +117,6 @@ export interface KeyStatus {
   openaiSet: boolean
   openaiBase: string
   openaiModel: string
-  context7Set: boolean
   relayUrl?: string
 }
 
@@ -115,7 +124,7 @@ export async function getKeys(): Promise<KeyStatus | null> {
   try { return await (await fetch(url('/api/keys'))).json() } catch { return null }
 }
 
-export async function saveKeys(keys: { openaiKey?: string; openaiBase?: string; openaiModel?: string; context7Key?: string; relayUrl?: string }) {
+export async function saveKeys(keys: { openaiKey?: string; openaiBase?: string; openaiModel?: string; relayUrl?: string }) {
   try {
     return await (await fetch(url('/api/keys'), {
       method: 'POST',

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import {
-  ROUNDS, SECTOR, ENERGY_MAX, COST_HINT, COST_AI, RECHARGE_SEC,
+  ROUNDS, SECTOR, ENERGY_MAX, COST_HINT, COST_AI,
   PY_CODE, CS_CODE, initial, reduce, fmt,
   type State, type Action, type Player,
 } from './duel'
@@ -11,7 +11,7 @@ import { Animator, Dots, Text, useBleeps } from '@arwes/react'
 import { Panel } from '@/components/ui/panel'
 import { cn } from '@/lib/utils'
 import { useAudio, useSfx, SOUND_PACKS, type Sfx, type SfxName } from './sfx'
-import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, wikiSearch, getKeys, saveKeys, discoverRoom, type AgentStatus } from './agent'
+import { getAgentStatus, openInEditor, judgeRound, getCode, saveCode, nivixAsk, docsSearch, docsRead, getKeys, saveKeys, discoverRoom, type AgentStatus, type DocResult } from './agent'
 import { useLiveRoom, createRoom, joinRoom, leaveRoom, getZt, setZtToken, createZtNetwork, relayCreate, relayJoin, relayLeave, type RoomMember } from './room'
 
 type Send = (a: Action) => void
@@ -28,25 +28,27 @@ function Chip({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted
   )
 }
 
+/** Window tabs - bleed into the panel header so they read as part of the frame. */
 function SegTabs({ value, onChange, items }: { value: string; onChange: (v: string) => void; items: { id: string; label: string }[] }) {
   return (
-    <div className="inline-flex items-center gap-0.5 p-0.5" style={{ background: 'color-mix(in oklab, var(--surface) 90%, black)', border: '1px solid var(--border)' }}>
-      {items.map(it => {
+    <div className="-mr-3 self-stretch flex items-stretch">
+      {items.map((it, i) => {
         const active = value === it.id
         return (
           <button
             key={it.id}
             onClick={() => onChange(it.id)}
-            className="font-mono text-[9px] tracking-[0.14em] px-2.5 py-1 cursor-pointer transition-colors"
+            className="relative px-3 font-mono text-[10px] tracking-[0.16em] cursor-pointer transition-colors"
             style={{
               color: active ? 'var(--color-primary)' : 'var(--text-muted)',
-              background: active ? 'color-mix(in oklab, var(--color-primary) 14%, transparent)' : 'transparent',
-              borderRadius: 3,
+              background: active ? 'color-mix(in oklab, var(--color-primary) 7%, transparent)' : 'transparent',
+              borderLeft: i ? '1px solid color-mix(in oklab, var(--border) 60%, transparent)' : undefined,
             }}
             onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
             onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-muted)' }}
           >
-            {it.label}
+            <span className="relative z-[1]">{it.label}</span>
+            <span aria-hidden className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: active ? 'var(--color-primary)' : 'transparent', boxShadow: active ? '0 0 10px color-mix(in oklab, var(--color-primary) 55%, transparent)' : undefined }} />
           </button>
         )
       })}
@@ -173,7 +175,7 @@ function EnergyGauge({ value, big }: { value: number; big?: boolean }) {
   const segH = big ? 14 : 9
   const gap = big ? 3 : 2
   return (
-    <span className="inline-flex items-center gap-1.5" title={`${value}/${max} charges · +1 every ${RECHARGE_SEC}s`}>
+    <span className="inline-flex items-center gap-1.5" title={`${value}/${max} charges · earn +1 per test passed`}>
       <span style={{ color: c, fontSize: big ? 14 : 11, lineHeight: 1 }}>⚡</span>
       <span className="inline-flex items-center">
         <span
@@ -613,6 +615,9 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
   const inRoom = !!room?.code || !!s.role
   const isHost = room ? room.role === 'host' : s.role === 'host'
   const canStart = members.length >= 1
+  const isRelay = room?.transport === 'relay'
+  const peerAddr = agent?.zerotier?.address || agent?.lan?.address || agent?.preferred || null
+  const PEER_PORT = 7789
 
   const doSolo = async () => {
     setNote(null)
@@ -674,30 +679,12 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
       <LobbyBackdrop />
       <div className="relative z-10 flex-1 overflow-auto flex justify-center">
         <div className="w-[min(820px,92vw)] flex flex-col gap-5 py-8">
-          <div className="flex justify-end -mb-2">
+          <div className="flex items-center justify-between -mb-2">
+            <span className="inline-block w-1.5 h-1.5 rounded-full" title={agent ? 'agent online' : 'no agent - mock mode'} style={{ background: agent ? 'var(--color-green)' : 'var(--text-muted)', boxShadow: agent ? 'var(--glow-green)' : undefined }} />
             <button onClick={onSettings} className="micro">⚙ SETTINGS</button>
           </div>
           <div className="text-center">
             <div className="font-orbitron font-bold text-[26px] tracking-[0.22em] text-primary" style={{ textShadow: '0 0 34px color-mix(in oklab, var(--color-primary) 40%, transparent)' }}>NIVIX ACADEMY</div>
-            <div className="font-mono text-[9px] tracking-[0.3em] mt-1.5" style={{ color: 'var(--text-muted)' }}>HTTP DUEL · PYTHON VS C#</div>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 font-mono text-[9px] tracking-[0.14em]">
-            {agent ? (
-              <>
-                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)', boxShadow: 'var(--glow-green)' }} />
-                <span style={{ color: 'var(--color-green)' }}>AGENT ONLINE</span>
-                {agent.zerotier
-                  ? <span style={{ color: 'var(--text-muted)' }}>· ZT {agent.zerotier.address}</span>
-                  : agent.lan ? <span style={{ color: 'var(--text-muted)' }}>· LAN {agent.lan.address}</span> : null}
-                {agent.editor ? <span style={{ color: 'var(--text-muted)' }}>· {agent.editor.name.toUpperCase()}</span> : null}
-              </>
-            ) : (
-              <>
-                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: 'var(--text-muted)' }} />
-                <span style={{ color: 'var(--text-muted)' }}>MOCK MODE · no agent</span>
-              </>
-            )}
           </div>
 
           <GameCard bodyClassName="flex gap-6 items-end p-5">
@@ -722,36 +709,52 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
 
           {!inRoom ? (
             <>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>MULTIPLAYER</span>
-                {(['online', 'lan'] as const).map(m => (
-                  <button key={m} onClick={() => setNetMode(m)} className="micro" style={{ color: netMode === m ? 'var(--color-primary)' : undefined, boxShadow: netMode === m ? 'inset 0 0 0 1px var(--color-primary)' : undefined }}>{m === 'online' ? 'ONLINE' : 'LAN'}</button>
-                ))}
-                <span className="font-mono text-[8px]" style={{ color: 'var(--text-muted)' }}>{netMode === 'online' ? 'via relay - any network' : 'same network only'}</span>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
                   <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>PLAY SOLO</span>
                   <p className="font-roboto text-[13px] leading-6" style={{ color: 'var(--text-muted)' }}>Practise alone. Judge your server, keep your score.</p>
                   <div className="mt-auto"><Button shape="flat" className="!mb-0 !px-5 !py-1.5" disabled={busy} onClick={doSolo}>START SOLO</Button></div>
                 </GameCard>
 
-                <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
-                  <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>HOST ROOM</span>
-                  <p className="font-roboto text-[13px] leading-6" style={{ color: 'var(--text-muted)' }}>Open a room and share the 6-character code.</p>
-                  <div className="mt-auto"><Button shape="flat" className="!mb-0 !px-5 !py-1.5" disabled={busy} onClick={doHost}>{busy ? 'WORKING…' : 'CREATE ROOM'}</Button></div>
-                </GameCard>
-
-                <GameCard bodyClassName="p-5 flex flex-col gap-3 h-full">
-                  <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>JOIN ROOM</span>
-                  <input
-                    value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                    onKeyDown={e => { if (e.key === 'Enter' && joinCode) doJoin() }}
-                    placeholder="CODE" maxLength={6}
-                    className="font-mono text-[18px] tracking-[0.3em] text-center uppercase px-3 py-2 border bg-transparent outline-none"
-                    style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-                  />
-                  <div className="mt-auto"><Button shape="flat" variant="secondary" className="!mb-0 !px-5 !py-1.5" disabled={busy || joinCode.length < 4} onClick={doJoin}>JOIN</Button></div>
+                <GameCard bodyClassName="flex flex-col h-full">
+                  <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2.5">
+                    <span className="font-mono text-[10px] tracking-[0.16em]" style={{ color: 'var(--color-accent)' }}>MULTIPLAYER</span>
+                    <div className="inline-flex items-stretch overflow-hidden" style={{ border: '1px solid var(--border)', borderRadius: 3, background: 'color-mix(in oklab, var(--surface-raised) 60%, transparent)' }}>
+                      {(['online', 'lan'] as const).map((m, i) => {
+                        const active = netMode === m
+                        return (
+                          <button
+                            key={m}
+                            onClick={() => setNetMode(m)}
+                            className="font-mono text-[9px] tracking-[0.14em] px-2.5 py-1 cursor-pointer transition-colors"
+                            style={{
+                              color: active ? 'var(--color-primary)' : 'var(--text-muted)',
+                              background: active ? 'color-mix(in oklab, var(--color-primary) 14%, transparent)' : 'transparent',
+                              borderLeft: i ? '1px solid var(--border)' : undefined,
+                            }}
+                          >{m === 'online' ? 'ONLINE' : 'LAN'}</button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div className="px-5 font-mono text-[8px] tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>{netMode === 'online' ? 'via relay - players join from anywhere' : 'same network only'}</div>
+                  <div className="grid grid-cols-2 gap-4 px-5 py-4 mt-auto" style={{ borderTop: '1px solid var(--border)' }}>
+                    <div className="flex flex-col gap-2.5">
+                      <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>HOST</span>
+                      <Button shape="flat" className="!mb-0 !px-4 !py-1.5" disabled={busy} onClick={doHost}>{busy ? 'WORKING...' : 'CREATE ROOM'}</Button>
+                    </div>
+                    <div className="flex flex-col gap-2.5">
+                      <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>JOIN</span>
+                      <input
+                        value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                        onKeyDown={e => { if (e.key === 'Enter' && joinCode) doJoin() }}
+                        placeholder="CODE" maxLength={6}
+                        className="font-mono text-[15px] tracking-[0.28em] text-center uppercase px-2 py-1.5 border bg-transparent outline-none"
+                        style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                      />
+                      <Button shape="flat" variant="secondary" className="!mb-0 !px-4 !py-1.5" disabled={busy || joinCode.length < 4} onClick={doJoin}>JOIN</Button>
+                    </div>
+                  </div>
                 </GameCard>
               </div>
 
@@ -759,15 +762,28 @@ function Lobby({ s, send, agent, onSettings, live }: { s: State; send: Send; age
             </>
           ) : (
             <>
-              <GameCard bodyClassName="p-4 grid grid-cols-[auto_1fr_auto] gap-x-5 gap-y-1.5 items-center">
-                <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>ROOM</span>
-                <span className="font-orbitron text-[26px] tracking-[0.24em] text-primary">{room?.code || s.room.code}</span>
-                <button
-                  onClick={() => { try { navigator.clipboard.writeText(room?.code || s.room.code); setNote('code copied') } catch { /* ignore */ } }}
-                  className="micro"
-                >COPY</button>
-                <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>PLAYERS</span>
-                <span className="font-mono text-[12px]" style={{ color: 'var(--text-secondary)' }}>{members.length}/{room?.maxPlayers || 8}{room?.transport ? ` · ${room.transport}` : ''}</span>
+              <GameCard bodyClassName="p-4 flex flex-col gap-3">
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>ROOM</span>
+                    <span className="font-orbitron text-[26px] tracking-[0.24em] text-primary leading-none">{room?.code || s.room.code}</span>
+                  </div>
+                  <button
+                    onClick={() => { try { navigator.clipboard.writeText(room?.code || s.room.code); setNote('code copied') } catch { /* ignore */ } }}
+                    className="micro self-center"
+                  >COPY</button>
+                  <span className="flex-1" />
+                  <div className="flex flex-col gap-0.5 items-end">
+                    <span className="font-mono text-[9px] tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>PLAYERS</span>
+                    <span className="font-mono text-[12px]" style={{ color: 'var(--text-secondary)' }}>{members.length}/{room?.maxPlayers || 8}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="px-1.5 py-0.5 shrink-0" style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in oklab, var(--color-primary) 35%, transparent)' }}>{isRelay ? 'ONLINE' : 'LAN'}</span>
+                  <span className="truncate">{isRelay
+                    ? 'share the code - players join from anywhere'
+                    : peerAddr ? `share ${peerAddr}:${PEER_PORT}` : 'peer discovery on your local network'}</span>
+                </div>
               </GameCard>
 
               <div className="flex flex-col gap-2">
@@ -974,9 +990,30 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
     { title: 'C# - HttpListener', url: 'https://learn.microsoft.com/dotnet/api/system.net.httplistener', source: 'MS Learn' },
   ]
   const canAsk = s.energy >= COST_AI
-  const [wikiQ, setWikiQ] = useState('')
-  const [wikiResults, setWikiResults] = useState<{ title: string; url: string; source: string }[] | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  const [docQ, setDocQ] = useState('')
+  const [docResults, setDocResults] = useState<DocResult[] | null>(null)
+  const [docOpen, setDocOpen] = useState<{ title: string; url: string; text: string } | null>(null)
+  const [docBusy, setDocBusy] = useState(false)
+  const [docError, setDocError] = useState<string | null>(null)
+
+  const runDocs = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = docQ.trim()
+    if (!q) return
+    setDocError(null); setDocBusy(true); setDocOpen(null)
+    const r = await docsSearch(q)
+    setDocBusy(false)
+    if (r?.ok) setDocResults(r.results || [])
+    else setDocError(r?.error || 'docs backend offline')
+  }
+
+  const readDoc = async (d: DocResult) => {
+    setDocError(null); setDocOpen({ title: d.title, url: d.url, text: 'loading...' })
+    const r = await docsRead(d.url)
+    if (r?.ok && r.text) setDocOpen({ title: r.title || d.title, url: d.url, text: r.text })
+    else { setDocOpen(null); setDocError(r?.error || 'could not load page') }
+  }
 
   const submitAsk = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -987,16 +1024,6 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
     const r = await nivixAsk(q)
     if (r?.ok && r.answer) send({ type: 'AI_ANSWER', value: q, answer: r.answer })
     else setNote(r?.error || 'NIVIX offline: set OPENAI_API_KEY in agent/.env')
-  }
-
-  const submitWiki = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const q = wikiQ.trim()
-    if (!q) return
-    setNote(null)
-    const r = await wikiSearch(q)
-    if (r?.ok) { setWikiResults(r.results || []); }
-    else setNote(r?.error || 'Context7 offline: set CONTEXT7_API_KEY in agent/.env')
   }
 
   return (
@@ -1054,19 +1081,49 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
         <>
           <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 shrink-0">
             <span className="w-1 h-3 shrink-0" style={{ background: 'var(--accent-secondary)' }} />
-            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>REFERENCE</span>
+            <span className="font-mono text-[9px] tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>{docOpen ? 'DOC READER' : 'DOCS SEARCH'}</span>
             <span className="flex-1" />
-            <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{docs.length}</span>
+            {docOpen
+              ? <button onClick={() => setDocOpen(null)} className="micro">BACK</button>
+              : <span className="font-mono text-[9px]" style={{ color: 'var(--text-muted)' }}>{docResults ? docResults.length : docs.length}</span>}
           </div>
-          <div className="flex-1 overflow-auto px-3 py-2 flex flex-col gap-1.5">
-            {docs.map((d, i) => (
-              <a key={i} href={d.url} target="_blank" rel="noreferrer" className="group text-left flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)' }}>
-                <span className="font-roboto text-[12px] flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>{d.title}</span>
-                <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{d.source}</span>
-                <span className="font-mono text-[12px] transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--accent-secondary)' }}>↗</span>
-              </a>
-            ))}
-          </div>
+
+          {docOpen ? (
+            <>
+              <div className="px-3 pb-2 shrink-0 flex flex-col gap-0.5">
+                <span className="font-roboto text-[12px] leading-5" style={{ color: 'var(--text-secondary)' }}>{docOpen.title}</span>
+                <a href={docOpen.url} target="_blank" rel="noreferrer" className="font-mono text-[8px] break-all" style={{ color: 'var(--accent-secondary)' }}>{docOpen.url}</a>
+              </div>
+              <div className="flex-1 overflow-auto px-3 pb-3">
+                <pre className="font-roboto text-[11px] leading-6 whitespace-pre-wrap m-0" style={{ color: 'var(--text-muted)' }}>{docOpen.text}</pre>
+              </div>
+            </>
+          ) : (
+            <>
+              <form onSubmit={runDocs} className="px-3 pb-2 shrink-0">
+                <div className="inputgroup">
+                  <span className="font-mono text-[12px]" style={{ color: 'var(--accent-secondary)' }}>?</span>
+                  <input value={docQ} onChange={e => setDocQ(e.target.value)} placeholder="search docs - MDN, RFC, Python, C#" className="flex-1 bg-transparent outline-none font-roboto text-[12px]" style={{ color: 'var(--text-secondary)' }} />
+                  <button type="submit" className="micro" disabled={docBusy}>{docBusy ? '...' : 'GO'}</button>
+                </div>
+              </form>
+              <div className="flex-1 overflow-auto px-3 pb-3 flex flex-col gap-1.5">
+                {docError && <div className="font-mono text-[9px] px-1" style={{ color: 'var(--color-amber)' }}>{docError}</div>}
+                {(docResults && docResults.length ? docResults : docs).map((d, i) => {
+                  const summary = (d as DocResult).summary
+                  return (
+                    <button key={i} onClick={() => readDoc(d)} className="group text-left flex flex-col gap-1 px-3 py-2 cursor-pointer transition-colors" style={{ background: 'color-mix(in oklab, var(--surface-raised) 55%, transparent)', border: '1px solid var(--border)' }}>
+                      <span className="flex items-center gap-2 w-full">
+                        <span className="font-roboto text-[12px] flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>{d.title}</span>
+                        <span className="font-mono text-[9px] px-1.5 py-0.5 shrink-0" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{d.source}</span>
+                      </span>
+                      {summary && <span className="font-roboto text-[10px] leading-4" style={{ color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{summary}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -1090,6 +1147,7 @@ function LeftTabs({ s, send }: { s: State; send: Send }) {
               </div>
             ))}
           </div>
+          {note && <div className="font-mono text-[9px] px-3 pb-1.5" style={{ color: 'var(--color-amber)' }}>{note}</div>}
           <form onSubmit={submitAsk} style={{ borderTop: '1px solid var(--border)' }}>
             <div className="p-2">
               <div className="inputgroup">
@@ -1476,7 +1534,7 @@ function Settings({ onClose }: { onClose: () => void }) {
     try { localStorage.setItem('duel.editor', v) } catch { /* ignore */ }
   }
 
-  const [keys, setKeys] = useState<{ openaiSet: boolean; openaiBase: string; openaiModel: string; context7Set: boolean; relayUrl?: string } | null>(null)
+  const [keys, setKeys] = useState<{ openaiSet: boolean; openaiBase: string; openaiModel: string; relayUrl?: string } | null>(null)
   const [openaiKey, setOpenaiKey] = useState('')
   const [openaiBase, setOpenaiBase] = useState('')
   const [openaiModel, setOpenaiModel] = useState('')

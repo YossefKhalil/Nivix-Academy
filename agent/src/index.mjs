@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* HTTP DUEL — local agent.
+/* Nivix Academy - local agent.
  *
  * Responsibilities:
  *   • serve the built UI (web/dist) and the game WebSocket
@@ -246,13 +246,25 @@ function aiConfig() {
     model: cfg.openaiModel || process.env.OPENAI_MODEL || 'gpt-4o-mini',
   }
 }
-function context7Config() {
-  const cfg = config.read()
-  return {
-    key: cfg.context7Key || process.env.CONTEXT7_API_KEY || '',
-    base: cfg.context7Base || process.env.CONTEXT7_BASE_URL || 'https://context7.com/api',
-    path: cfg.context7Path || process.env.CONTEXT7_SEARCH_PATH || '/v2/libs/search',
-  }
+const DOC_HOSTS = ['developer.mozilla.org', 'rfc-editor.org', 'www.rfc-editor.org', 'learn.microsoft.com', 'docs.python.org', 'nodejs.org', 'httpwg.org']
+
+/** Strip an HTML page down to readable text for the in-app reader. */
+function htmlToText(html) {
+  let s = String(html)
+  s = s.replace(/<script[\s\S]*?<\/script>/gi, '')
+  s = s.replace(/<style[\s\S]*?<\/style>/gi, '')
+  s = s.replace(/<nav[\s\S]*?<\/nav>/gi, '')
+  s = s.replace(/<header[\s\S]*?<\/header>/gi, '')
+  s = s.replace(/<footer[\s\S]*?<\/footer>/gi, '')
+  const art = s.match(/<article[\s\S]*?<\/article>/i)
+  if (art) s = art[0]
+  s = s.replace(/<(br|\/p|\/h[1-6]|\/li|\/div|\/tr)\s*\/?>/gi, '\n')
+  s = s.replace(/<li[^>]*>/gi, '- ')
+  s = s.replace(/<[^>]+>/g, '')
+  s = s.replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+  s = s.replace(/&quot;/gi, '"').replace(/&#39;/g, "'").replace(/&mdash;/gi, '-').replace(/&ndash;/gi, '-')
+  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ')
+  return s.trim()
 }
 
 async function resolveNetwork(requested) {
@@ -476,6 +488,51 @@ const server = http.createServer(async (req, res) => {
       }
 
 
+      if (url.pathname === '/api/docs' && req.method === 'GET') {
+        const q = (url.searchParams.get('q') || '').trim()
+        if (!q) return sendJson(res, 400, { ok: false, error: 'q required' })
+        const base = (config.read().docsBase || process.env.DOCS_BASE_URL || 'https://developer.mozilla.org/api/v1/search').replace(/\/$/, '')
+        try {
+          const u = new URL(base)
+          u.searchParams.set('q', q)
+          u.searchParams.set('locale', 'en-US')
+          const r = await fetch(u, { headers: { accept: 'application/json' } })
+          if (!r.ok) return sendJson(res, 502, { ok: false, error: 'docs backend HTTP ' + r.status })
+          const j = await r.json()
+          const docs = j?.documents || j?.hits || j?.results || j?.data || []
+          const results = docs.slice(0, 12).map(d => {
+            const raw = String(d.url || d.slug || '')
+            const link = raw.startsWith('http') ? raw
+              : raw.startsWith('/') ? 'https://developer.mozilla.org' + raw
+                : 'https://developer.mozilla.org/en-US/docs/' + raw
+            return { title: d.title || d.name || link, url: link, source: 'MDN', summary: String(d.summary || '').replace(/<[^>]+>/g, '').trim() }
+          })
+          return sendJson(res, 200, { ok: true, results })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
+      }
+
+      if (url.pathname === '/api/docs/read' && req.method === 'GET') {
+        const target = (url.searchParams.get('url') || '').trim()
+        if (!target) return sendJson(res, 400, { ok: false, error: 'url required' })
+        let parsed
+        try { parsed = new URL(target) } catch { return sendJson(res, 400, { ok: false, error: 'bad url' }) }
+        if (!/^https?:$/.test(parsed.protocol) || !DOC_HOSTS.includes(parsed.hostname)) {
+          return sendJson(res, 400, { ok: false, error: 'host not allowed' })
+        }
+        try {
+          const r = await fetch(parsed, { headers: { 'user-agent': 'NivixAcademy/1.0', accept: 'text/html,text/plain' } })
+          if (!r.ok) return sendJson(res, 502, { ok: false, error: 'page HTTP ' + r.status })
+          const type = r.headers.get('content-type') || ''
+          const body = await r.text()
+          const text = type.includes('text/plain') ? body : htmlToText(body)
+          return sendJson(res, 200, { ok: true, title: decodeURIComponent(parsed.pathname.split('/').pop() || target), text: text.slice(0, 20000) })
+        } catch (e) {
+          return sendJson(res, 502, { ok: false, error: String(e?.message || e) })
+        }
+      }
+
       if (url.pathname === '/api/keys' && req.method === 'GET') {
         const ai = aiConfig()
         return sendJson(res, 200, {
@@ -491,7 +548,6 @@ const server = http.createServer(async (req, res) => {
         if (typeof body.openaiKey === 'string' && body.openaiKey.trim()) patch.openaiKey = body.openaiKey.trim()
         if (typeof body.openaiBase === 'string' && body.openaiBase.trim()) patch.openaiBase = body.openaiBase.trim()
         if (typeof body.openaiModel === 'string' && body.openaiModel.trim()) patch.openaiModel = body.openaiModel.trim()
-        if (typeof body.context7Key === 'string' && body.context7Key.trim()) patch.context7Key = body.context7Key.trim()
         if (typeof body.relayUrl === 'string') patch.relayUrl = body.relayUrl.trim()
         config.write(patch)
         return sendJson(res, 200, { ok: true })

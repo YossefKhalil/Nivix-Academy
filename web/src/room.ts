@@ -1,4 +1,4 @@
-/* Live room client — talks to the local agent over /ws/local and the room API. */
+/* Live room client - talks to the local agent over /ws/local and the room API. */
 import { useEffect, useRef, useState } from 'react'
 
 export interface RoomMember {

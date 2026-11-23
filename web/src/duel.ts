@@ -1,5 +1,4 @@
-/* HTTP DUEL - mock state machine.
-   Ported from http-duel/prototype/duel-ux-mock.html.
+/* Nivix Academy game state machine.
    Pure logic only; the React layer lives in App.tsx. */
 
 export type Lang = 'python' | 'csharp'
@@ -10,7 +9,8 @@ export const SECTOR = 'HTTP & NETWORKING'
 export const ENERGY_MAX = 10
 export const COST_HINT = 1
 export const COST_AI = 6
-export const RECHARGE_SEC = 8
+/** Recharge is answer-driven: earn charges by passing tests, never by waiting. */
+export const ENERGY_PER_PASS = 1
 
 /* Course content (briefs, starters, tests) comes from the shared content file. */
 import { ROUNDS, PY_CODE, CS_CODE, LESSONS } from './content'
@@ -106,7 +106,6 @@ function maybeResolve(s: State) {
 function tick(s: State) {
   if (s.screen !== 'match') return
   s.elapsed++
-  if (s.elapsed % RECHARGE_SEC === 0) s.energy = Math.min(ENERGY_MAX, s.energy + 1)
 }
 export function aiAnswer(q: string) {
   const t = q.toLowerCase()
@@ -155,12 +154,16 @@ export function reduce(s0: State, a: Action): State {
       s.ranTests = true
       const total = ROUNDS[s.round - 1].tests.length
       const arr: ({ name: string; pass: boolean } | null)[] = s.testResults ? [...s.testResults] : new Array(total).fill(null)
+      const prevPassed = arr.filter(x => x && x.pass).length
       for (const r of (a.results || [])) {
         const idx = typeof r.index === 'number' ? r.index : arr.findIndex(x => x && x.name === r.name)
         if (idx >= 0 && idx < total) arr[idx] = { name: r.name, pass: r.pass }
       }
       s.testResults = arr
-      s.me.score = arr.filter(x => x && x.pass).length
+      const nowPassed = arr.filter(x => x && x.pass).length
+      const gained = Math.max(0, nowPassed - prevPassed)
+      s.me.score = nowPassed
+      if (gained > 0) s.energy = Math.min(ENERGY_MAX, s.energy + gained * ENERGY_PER_PASS)
       s.me.stage = Math.max(1, Math.min(3, 1 + Math.floor((3 * s.me.score) / Math.max(1, total))))
       break
     }

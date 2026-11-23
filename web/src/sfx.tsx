@@ -1,7 +1,7 @@
-/* Sound layer for HTTP DUEL — built on Arwes' bleeps manager.
+/* Sound layer for Nivix Academy - built on Arwes' bleeps manager.
 
    Default pack is the ARWES demo set (next.arwes.dev): click, hover, type,
-   assemble, info, error, intro — same bleeps the Arwes docs site uses.
+   assemble, info, error, intro - same bleeps the Arwes docs site uses.
    A CC0 Kenney "Interface Sounds" pack is bundled as a comparison toggle.
 
    Every bleep lists multiple sources; the browser plays the first it supports. */
@@ -26,7 +26,7 @@ const K = (name: string): Source[] => [
   { src: `/sounds/kenney/${name}.mp3`, type: 'audio/mpeg' },
 ]
 
-// Dedicated countdown beep (tonal, gentle) — shared by both packs.
+// Dedicated countdown beep (tonal, gentle) - shared by both packs.
 const TICK: Source[] = [
   { src: '/sounds/tick.ogg', type: 'audio/ogg' },
   { src: '/sounds/tick.mp3', type: 'audio/mpeg' },
